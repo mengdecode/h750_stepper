@@ -1,0 +1,12 @@
+from building import *
+
+cwd = GetCurrentDir()
+src = []
+path = [cwd]
+
+# 公共驱动: 被 speed_loop 或 pos_loop 依赖时编译
+if GetDepend('BSP_USING_STEPPER_COMMON'):
+    src += Glob('*.c')
+
+group = DefineGroup('stepper_common', src, depend=['BSP_USING_STEPPER_COMMON'], CPPPATH=path)
+Return('group')

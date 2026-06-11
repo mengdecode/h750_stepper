@@ -1,0 +1,975 @@
+menu "Hardware Drivers Config"
+    config SOC_STM32H750_ARTPI
+        bool
+        default y
+
+menu "On-chip Peripheral Drivers"
+
+    config BSP_SCB_ENABLE_I_CACHE
+        bool "Enable ICACHE"
+        default y
+
+    config BSP_SCB_ENABLE_D_CACHE
+        bool "Enable DCACHE"
+        default y
+
+    config BSP_USING_GPIO
+        bool "Enable GPIO"
+        select RT_USING_PIN
+        default y
+
+    menuconfig BSP_USING_UART
+        bool "Enable UART"
+        default n
+        select RT_USING_SERIAL
+        select RT_SERIAL_USING_DMA
+        if BSP_USING_UART
+            config BSP_STM32_UART_V1_TX_TIMEOUT
+                int "UART TX timeout"
+                default 6000
+                depends on RT_USING_SERIAL_V1
+                
+            menuconfig BSP_USING_UART1
+                bool "Enable UART1"
+                default n
+                if BSP_USING_UART1
+                    config BSP_UART1_RX_USING_DMA
+                        bool "Enable UART1 RX DMA"
+                        depends on BSP_USING_UART1 && RT_SERIAL_USING_DMA
+                        default n
+
+                    config BSP_UART1_TX_USING_DMA
+                        bool "Enable UART1 TX DMA"
+                        depends on BSP_USING_UART1 && RT_SERIAL_USING_DMA
+                        default n
+
+                    config BSP_UART1_RX_BUFSIZE
+                        int "Set UART1 RX buffer size"
+                        range 64 65535
+                        depends on BSP_USING_UART1
+                        default 256
+
+                    config BSP_UART1_TX_BUFSIZE
+                        int "Set UART1 TX buffer size"
+                        range 0 65535
+                        depends on BSP_USING_UART1
+                        default 0
+
+                    config BSP_UART1_DMA_PING_BUFSIZE
+                        int "Set UART1 RX DMA ping-pong buffer size"
+                        range 32 65535
+                        depends on RT_USING_SERIAL_V2 && BSP_UART1_RX_USING_DMA
+                        default 64                        
+
+                endif
+
+            menuconfig BSP_USING_UART3
+                bool "Enable UART3"
+                default n
+                if BSP_USING_UART3
+                    config BSP_UART3_RX_BUFSIZE
+                        int "Set UART3 RX buffer size"
+                        range 64 65535
+                        depends on BSP_USING_UART3
+                        default 256
+
+                    config BSP_UART3_TX_BUFSIZE
+                        int "Set UART3 TX buffer size"
+                        range 0 65535
+                        depends on BSP_USING_UART3
+                        default 0
+                endif
+
+            menuconfig BSP_USING_UART4
+                bool "Enable UART4"
+                default n
+                if BSP_USING_UART4
+                    config BSP_UART4_RX_BUFSIZE
+                        int "Set UART4 RX buffer size"
+                        range 64 65535
+                        depends on BSP_USING_UART4
+                        default 256
+
+                    config BSP_UART4_TX_BUFSIZE
+                        int "Set UART4 TX buffer size"
+                        range 0 65535
+                        depends on BSP_USING_UART4
+                        default 0
+                endif
+
+            menuconfig BSP_USING_UART6
+                bool "Enable UART6"
+                default n
+                if BSP_USING_UART6
+                    config BSP_UART6_RX_BUFSIZE
+                        int "Set UART6 RX buffer size"
+                        range 64 65535
+                        depends on BSP_USING_UART6
+                        default 256
+
+                    config BSP_UART6_TX_BUFSIZE
+                        int "Set UART6 TX buffer size"
+                        range 0 65535
+                        depends on BSP_USING_UART6
+                        default 0
+
+                endif
+        endif
+
+    menuconfig BSP_USING_LPTIM
+        bool "Enable lptimer"
+        default n
+        select RT_USING_LPTIMER
+        select RT_USING_HWTIMER
+        if BSP_USING_LPTIM
+            config BSP_USING_LPTIM1
+                bool "Enable LPTIM1"
+                default n
+            config BSP_USING_LPTIM2
+                bool "Enable LPTIM2"
+                default n
+            config BSP_USING_LPTIM3
+                bool "Enable LPTIM3"
+                default n
+        endif
+
+    menuconfig BSP_USING_SPI
+        bool "Enable SPI"
+        default n
+        select RT_USING_SPI
+        if BSP_USING_SPI
+            config BSP_USING_SPI1
+                bool "Enable SPI1"
+                default n
+            config BSP_USING_SPI2
+                bool "Enable SPI2"
+                default n
+            config BSP_USING_SPI3
+                bool "Enable SPI3"
+                default n
+            config BSP_USING_SPI4
+                bool "Enable SPI4"
+                default n
+        endif
+
+    config BSP_USING_QSPI
+        bool "Enable QSPI BUS"
+        select RT_USING_QSPI
+        select RT_USING_SPI
+        default n
+
+    config BSP_USING_ONCHIP_RTC
+        bool "Enable Onchip RTC"
+        select RT_USING_RTC
+        default n
+
+    menuconfig BSP_USING_I2C
+        bool "Enable I2C BUS (software simulation)"
+        select RT_USING_I2C
+        select RT_USING_I2C_BITOPS
+        select RT_USING_PIN
+        default n
+        if BSP_USING_I2C
+            menuconfig BSP_USING_I2C1
+                bool "Enable I2C1 BUS (software simulation)"
+                default n
+                select RT_USING_I2C
+                select RT_USING_I2C_BITOPS
+                select RT_USING_PIN
+                if BSP_USING_I2C1
+                    comment "Notice: PB6 --> 22; PB7 --> 23"
+                    config BSP_I2C1_SCL_PIN
+                        int "I2C1 scl pin number"
+                        range 0 175
+                        default 22
+                    config BSP_I2C1_SDA_PIN
+                        int "I2C1 sda pin number"
+                        range 0 175
+                        default 23
+                endif
+            menuconfig BSP_USING_I2C2
+                bool "Enable I2C2 BUS (software simulation)"
+                default n
+                if BSP_USING_I2C2
+                    comment "Notice: PH13 --> 125; PH15 --> 127"
+                    config BSP_I2C2_SCL_PIN
+                        int "i2c2 scl pin number"
+                        range 1 176
+                        default 127
+                    config BSP_I2C2_SDA_PIN
+                        int "I2C2 sda pin number"
+                        range 0 175
+                        default 125
+                endif
+            menuconfig BSP_USING_I2C3
+                bool "Enable I2C3 BUS (software simulation)"
+                default n
+                if BSP_USING_I2C3
+                    comment "Notice: PH12 --> 124; PH11 --> 123"
+                    config BSP_I2C3_SCL_PIN
+                        int "i2c3 scl pin number"
+                        range 0 175
+                        default 123
+                    config BSP_I2C3_SDA_PIN
+                        int "I2C3 sda pin number"
+                        range 0 175
+                        default 124
+                endif
+        endif
+
+    config BSP_USING_SDRAM
+        bool "Enable SDRAM"
+        select RT_USING_MEMHEAP
+        default n
+
+    config BSP_USING_WDT
+        bool "Enable Watchdog Timer"
+        select RT_USING_WDT
+        default n
+
+    config BSP_USING_USBD
+        bool "Enable USB Device"
+        select RT_USING_USB_DEVICE
+        default n
+
+    menuconfig BSP_USING_USBH
+        bool "Enable USB Host"
+        select RT_USING_USB_HOST
+        default n
+        if BSP_USING_USBH
+            menuconfig RT_USBH_MSTORAGE
+                bool "Enable Udisk Drivers"
+                select RT_USING_DFS
+                select RT_USING_DFS_ELMFAT
+                default n
+                if RT_USBH_MSTORAGE
+                    config UDISK_MOUNTPOINT
+                        string "Udisk mount dir"
+                        default "/"
+                endif
+        endif
+
+    config BSP_USING_LTDC
+        bool
+        default n
+    source "$(BSP_DIR)/libraries/HAL_Drivers/drivers/Kconfig"
+
+        menuconfig BSP_USING_TIM
+        bool "Enable Timer"
+        default n
+        if BSP_USING_TIM
+            config BSP_USING_TIM1
+                bool "Enable TIM1"
+                default n
+            config BSP_USING_TIM2
+                bool "Enable TIM2"
+                default n
+            config BSP_USING_TIM3
+                bool "Enable TIM3"
+                default n
+            config BSP_USING_TIM4
+                bool "Enable TIM4"
+                default n
+            config BSP_USING_TIM5
+                bool "Enable TIM5"
+                default n
+            config BSP_USING_TIM9
+                bool "Enable TIM9"
+                default n
+            config BSP_USING_TIM10
+                bool "Enable TIM10"
+                default n
+            config BSP_USING_TIM11
+                bool "Enable TIM11"
+                default n
+        endif
+
+        menuconfig BSP_USING_PWM
+        bool "Enable PWM"
+        default n
+        if BSP_USING_PWM
+            config BSP_USING_PWM1
+                bool "Enable PWM1"
+                default n
+            if BSP_USING_PWM1
+                config  BSP_USING_PWM1_CH1
+                    bool "Enable PWM1 CH1"
+                    default n   
+                config  BSP_USING_PWM1_CH2
+                    bool "Enable PWM1 CH2"
+                    default n 
+                config  BSP_USING_PWM1_CH3
+                    bool "Enable PWM1 CH3"     
+                    default n
+                config  BSP_USING_PWM1_CH4
+                    bool "Enable PWM1 CH4"
+                    default n   
+            endif
+            config BSP_USING_PWM2
+                bool "Enable PWM2"
+                default n
+            if BSP_USING_PWM2
+                config  BSP_USING_PWM2_CH1
+                    bool "Enable PWM2 CH1"
+                    default n   
+                config  BSP_USING_PWM2_CH2
+                    bool "Enable PWM2 CH2"
+                    default n   
+                config  BSP_USING_PWM2_CH3
+                    bool "Enable PWM2 CH3"
+                    default n
+                config  BSP_USING_PWM2_CH4
+                    bool "Enable PWM2 CH4"
+                    default n
+            endif
+            config BSP_USING_PWM3
+                bool "Enable PWM3"
+                default n
+            config BSP_USING_PWM4
+                bool "Enable PWM4"
+                default n
+            if BSP_USING_PWM4
+                config  BSP_USING_PWM4_CH1
+                    bool "Enable PWM4 CH1"
+                    default n   
+                config  BSP_USING_PWM4_CH2
+                    bool "Enable PWM4 CH2"
+                    default n 
+                config  BSP_USING_PWM4_CH3
+                    bool "Enable PWM4 CH3"     
+                    default n
+                config  BSP_USING_PWM4_CH4
+                    bool "Enable PWM4 CH4"
+                    default n   
+            endif      
+            config BSP_USING_PWM5
+                bool "Enable PWM5"
+                default n
+            if BSP_USING_PWM5
+                config  BSP_USING_PWM5_CH1
+                    bool "Enable PWM5 CH1"
+                    default n   
+                config  BSP_USING_PWM5_CH2
+                    bool "Enable PWM5 CH2"
+                    default n 
+                config  BSP_USING_PWM5_CH3
+                    bool "Enable PWM5 CH3"     
+                    default n
+                config  BSP_USING_PWM5_CH4
+                    bool "Enable PWM5 CH4"
+                    default n   
+            endif  
+            config BSP_USING_PWM8
+                bool "Enable PWM8"
+                default n
+            if BSP_USING_PWM8
+                config  BSP_USING_PWM8_CH1
+                    bool "Enable PWM8 CH1"
+                    default n   
+                config  BSP_USING_PWM8_CH2
+                    bool "Enable PWM8 CH2"
+                    default n 
+                config  BSP_USING_PWM8_CH3
+                    bool "Enable PWM8 CH3"     
+                    default n
+                config  BSP_USING_PWM8_CH4
+                    bool "Enable PWM8 CH4"
+                    default n   
+                config  BSP_USING_PWM8_CH5
+                    bool "Enable PWM8 CH5"     
+                    default n
+                config  BSP_USING_PWM8_CH6
+                    bool "Enable PWM8 CH6"
+                    default n   
+            endif 
+            config BSP_USING_PWM15
+                bool "Enable PWM15"
+                default n
+            if BSP_USING_PWM15
+                config  BSP_USING_PWM15_CH1
+                    bool "Enable PWM15 CH1"
+                    default n   
+                config  BSP_USING_PWM15_CH2
+                    bool "Enable PWM15 CH2"
+                    default n 
+            endif  
+        endif
+
+
+        menuconfig BSP_USING_PULSE_ENCODER
+            bool "Enable Pulse Encoder"
+            default n
+            if BSP_USING_PULSE_ENCODER
+                config BSP_USING_PULSE_ENCODER1
+                    bool "Enable Pulse Encoder1"
+                    default n
+            endif
+            if BSP_USING_PULSE_ENCODER
+                config BSP_USING_PULSE_ENCODER2
+                    bool "Enable Pulse Encoder2"
+                    default n
+            endif
+            if BSP_USING_PULSE_ENCODER  
+                config BSP_USING_PULSE_ENCODER3
+                    bool "Enable Pulse Encoder3"
+                    default n
+            endif
+            if BSP_USING_PULSE_ENCODER
+                config BSP_USING_PULSE_ENCODER4
+                    bool "Enable Pulse Encoder4"
+                    default n  
+            endif    
+
+    menuconfig BSP_USING_STEPPER_OPEN_LOOP
+        bool "Enable Stepper Open-loop Control"
+        select BSP_USING_PWM
+        select BSP_USING_PWM2
+        select BSP_USING_TIM
+        select BSP_USING_TIM4
+        select RT_USING_HWTIMER
+        select RT_USING_PIN
+        default n
+        if BSP_USING_STEPPER_OPEN_LOOP
+            config STEPPEROL_MOTOR_PWM_DEV
+                string "Motor PWM device"
+                default "pwm2"
+            config STEPPEROL_MOTOR_PWM_CH
+                int "Motor PWM channel (1-4)"
+                range 1 4
+                default 1
+            config STEPPEROL_MOTOR_DIR_PIN
+                int "Direction GPIO pin"
+                range 0 175
+                default 33
+            config STEPPEROL_MOTOR_EN_PIN
+                int "Enable GPIO pin"
+                range 0 175
+                default 32
+            config STEPPEROL_CTRL_TIMER_DEV
+                string "Control timer device"
+                default "timer4"
+            config STEPPEROL_CTRL_PERIOD_US
+                int "Control period (us)"
+                default 20000
+            config STEPPEROL_MAX_ACCEL
+                int "Max acceleration (Hz/period)"
+                default 500
+        endif
+
+    config BSP_USING_STEPPER_COMMON
+        bool
+        default n
+
+    menuconfig BSP_USING_STEPPER_SPEED_LOOP
+        bool "Enable Stepper Speed-loop Control (Positional PID)"
+        select BSP_USING_TIM
+        select BSP_USING_TIM4
+        select RT_USING_HWTIMER
+        select RT_USING_PIN
+        select BSP_USING_STEPPER_COMMON
+        default n
+        if BSP_USING_STEPPER_SPEED_LOOP
+            config SPEED_LOOP_MOTOR_COUNT
+                int "Number of motors (1-4)"
+                range 1 4
+                default 1
+            config SPEED_LOOP_CTRL_PERIOD_US
+                int "Control period (us)"
+                default 20000
+
+        comment "---- Motor 0 Configuration ----"
+        menu "Motor 0"
+            config SPEED_LOOP_M0_TIM_INDEX
+                int "TIM index (1=TIM1,2=TIM2,3=TIM3,4=TIM4,5=TIM5,8=TIM8)"
+                range 1 15
+                default 2
+            config SPEED_LOOP_M0_TIM_CH
+                int "TIM channel (1-4)"
+                range 1 4
+                default 1
+            config SPEED_LOOP_M0_TIM_CLK_HZ
+                int "TIM clock (Hz)"
+                default 200000000
+            config SPEED_LOOP_M0_PULSE_PORT_INDEX
+                int "Pulse GPIO port index (0=A,1=B,2=C,3=D,4=E,5=F,6=G,7=H,8=I,9=J,10=K)"
+                range 0 10
+                default 0
+            config SPEED_LOOP_M0_PULSE_PIN
+                int "Pulse GPIO pin number (0-15)"
+                range 0 15
+                default 0
+            config SPEED_LOOP_M0_PULSE_AF
+                int "Pulse GPIO alternate function (0-15)"
+                range 0 15
+                default 1
+            config SPEED_LOOP_M0_DIR_PIN
+                int "Direction GPIO pin"
+                range 0 175
+                default 33
+            config SPEED_LOOP_M0_EN_PIN
+                int "Enable GPIO pin"
+                range 0 175
+                default 32
+            config SPEED_LOOP_M0_ENC_TIM_INDEX
+                int "Encoder TIM index"
+                range 1 15
+                default 3
+            config SPEED_LOOP_M0_ENC_CH1_PORT_INDEX
+                int "Encoder CH1 port index (0=A..10=K)"
+                range 0 10
+                default 2
+            config SPEED_LOOP_M0_ENC_CH1_PIN
+                int "Encoder CH1 pin number"
+                range 0 15
+                default 6
+            config SPEED_LOOP_M0_ENC_CH1_AF
+                int "Encoder CH1 AF"
+                range 0 15
+                default 2
+            config SPEED_LOOP_M0_ENC_CH2_PORT_INDEX
+                int "Encoder CH2 port index"
+                range 0 10
+                default 2
+            config SPEED_LOOP_M0_ENC_CH2_PIN
+                int "Encoder CH2 pin number"
+                range 0 15
+                default 7
+            config SPEED_LOOP_M0_ENC_CH2_AF
+                int "Encoder CH2 AF"
+                range 0 15
+                default 2
+            config SPEED_LOOP_M0_CTRL_TIMER
+                string "Control hwtimer device"
+                default "timer4"
+            config SPEED_LOOP_M0_STEPS_PER_REV
+                int "Steps per revolution (360/step_angle * microstep)"
+                default 6400
+            config SPEED_LOOP_M0_ENC_COUNTS_PER_REV
+                int "Encoder counts per revolution (lines * 4)"
+                default 4000
+            config SPEED_LOOP_M0_ENC_INVERT
+                int "Invert encoder direction (1=invert)"
+                range 0 1
+                default 1
+            config SPEED_LOOP_M0_SPEED_LIMIT
+                int "Speed limit (Hz)"
+                default 100000
+            config SPEED_LOOP_M0_MOVE_THRESHOLD
+                int "Move threshold (Hz)"
+                default 50
+            config SPEED_LOOP_M0_MAX_ACCEL
+                int "Max acceleration (Hz/period)"
+                default 500
+            config SPEED_LOOP_M0_KP
+                int "Kp (scaled x1000, 500=0.5)"
+                default 500
+            config SPEED_LOOP_M0_KI
+                int "Ki (scaled x1000, 200=0.2)"
+                default 200
+            config SPEED_LOOP_M0_KD
+                int "Kd (scaled x1000, 50=0.05)"
+                default 50
+        endmenu
+
+        if SPEED_LOOP_MOTOR_COUNT >= 2
+        comment "---- Motor 1 Configuration ----"
+        menu "Motor 1"
+            config SPEED_LOOP_M1_TIM_INDEX
+                int "TIM index"
+                range 1 15
+                default 5
+            config SPEED_LOOP_M1_TIM_CH
+                int "TIM channel (1-4)"
+                range 1 4
+                default 1
+            config SPEED_LOOP_M1_TIM_CLK_HZ
+                int "TIM clock (Hz)"
+                default 200000000
+            config SPEED_LOOP_M1_PULSE_PORT_INDEX
+                int "Pulse GPIO port index"
+                range 0 10
+                default 0
+            config SPEED_LOOP_M1_PULSE_PIN
+                int "Pulse GPIO pin number"
+                range 0 15
+                default 1
+            config SPEED_LOOP_M1_PULSE_AF
+                int "Pulse GPIO alternate function"
+                range 0 15
+                default 2
+            config SPEED_LOOP_M1_DIR_PIN
+                int "Direction GPIO pin"
+                range 0 175
+                default 35
+            config SPEED_LOOP_M1_EN_PIN
+                int "Enable GPIO pin"
+                range 0 175
+                default 34
+            config SPEED_LOOP_M1_ENC_TIM_INDEX
+                int "Encoder TIM index"
+                range 1 15
+                default 8
+            config SPEED_LOOP_M1_ENC_CH1_PORT_INDEX
+                int "Encoder CH1 port index"
+                range 0 10
+                default 2
+            config SPEED_LOOP_M1_ENC_CH1_PIN
+                int "Encoder CH1 pin number"
+                range 0 15
+                default 8
+            config SPEED_LOOP_M1_ENC_CH1_AF
+                int "Encoder CH1 AF"
+                range 0 15
+                default 3
+            config SPEED_LOOP_M1_ENC_CH2_PORT_INDEX
+                int "Encoder CH2 port index"
+                range 0 10
+                default 2
+            config SPEED_LOOP_M1_ENC_CH2_PIN
+                int "Encoder CH2 pin number"
+                range 0 15
+                default 9
+            config SPEED_LOOP_M1_ENC_CH2_AF
+                int "Encoder CH2 AF"
+                range 0 15
+                default 3
+            config SPEED_LOOP_M1_CTRL_TIMER
+                string "Control hwtimer device"
+                default "timer5"
+            config SPEED_LOOP_M1_STEPS_PER_REV
+                int "Steps per revolution"
+                default 6400
+            config SPEED_LOOP_M1_ENC_COUNTS_PER_REV
+                int "Encoder counts per revolution"
+                default 4000
+            config SPEED_LOOP_M1_ENC_INVERT
+                int "Invert encoder direction (1=invert)"
+                range 0 1
+                default 1
+            config SPEED_LOOP_M1_SPEED_LIMIT
+                int "Speed limit (Hz)"
+                default 20000
+            config SPEED_LOOP_M1_MOVE_THRESHOLD
+                int "Move threshold (Hz)"
+                default 50
+            config SPEED_LOOP_M1_MAX_ACCEL
+                int "Max acceleration (Hz/period)"
+                default 200
+            config SPEED_LOOP_M1_KP
+                int "Kp (scaled x1000, 100=0.1)"
+                default 100
+            config SPEED_LOOP_M1_KI
+                int "Ki (scaled x1000, 200=0.2)"
+                default 200
+            config SPEED_LOOP_M1_KD
+                int "Kd (scaled x1000, 50=0.05)"
+                default 50
+        endmenu
+        endif
+
+        if SPEED_LOOP_MOTOR_COUNT >= 3
+        comment "---- Motor 2 Configuration ----"
+        menu "Motor 2"
+            config SPEED_LOOP_M2_TIM_INDEX
+                int "TIM index"
+                range 1 15
+                default 8
+            config SPEED_LOOP_M2_TIM_CH
+                int "TIM channel (1-4)"
+                range 1 4
+                default 1
+            config SPEED_LOOP_M2_TIM_CLK_HZ
+                int "TIM clock (Hz)"
+                default 200000000
+            config SPEED_LOOP_M2_PULSE_PORT_INDEX
+                int "Pulse GPIO port index"
+                range 0 10
+                default 2
+            config SPEED_LOOP_M2_PULSE_PIN
+                int "Pulse GPIO pin number"
+                range 0 15
+                default 6
+            config SPEED_LOOP_M2_PULSE_AF
+                int "Pulse GPIO alternate function"
+                range 0 15
+                default 3
+            config SPEED_LOOP_M2_DIR_PIN
+                int "Direction GPIO pin"
+                range 0 175
+                default 37
+            config SPEED_LOOP_M2_EN_PIN
+                int "Enable GPIO pin"
+                range 0 175
+                default 36
+            config SPEED_LOOP_M2_ENC_TIM_INDEX
+                int "Encoder TIM index"
+                range 1 15
+                default 2
+            config SPEED_LOOP_M2_ENC_CH1_PORT_INDEX
+                int "Encoder CH1 port index"
+                range 0 10
+                default 0
+            config SPEED_LOOP_M2_ENC_CH1_PIN
+                int "Encoder CH1 pin number"
+                range 0 15
+                default 15
+            config SPEED_LOOP_M2_ENC_CH1_AF
+                int "Encoder CH1 AF"
+                range 0 15
+                default 1
+            config SPEED_LOOP_M2_ENC_CH2_PORT_INDEX
+                int "Encoder CH2 port index"
+                range 0 10
+                default 1
+            config SPEED_LOOP_M2_ENC_CH2_PIN
+                int "Encoder CH2 pin number"
+                range 0 15
+                default 3
+            config SPEED_LOOP_M2_ENC_CH2_AF
+                int "Encoder CH2 AF"
+                range 0 15
+                default 1
+            config SPEED_LOOP_M2_CTRL_TIMER
+                string "Control hwtimer device"
+                default "timer12"
+            config SPEED_LOOP_M2_STEPS_PER_REV
+                int "Steps per revolution"
+                default 6400
+            config SPEED_LOOP_M2_ENC_COUNTS_PER_REV
+                int "Encoder counts per revolution"
+                default 4000
+            config SPEED_LOOP_M2_ENC_INVERT
+                int "Invert encoder direction (1=invert)"
+                range 0 1
+                default 1
+            config SPEED_LOOP_M2_SPEED_LIMIT
+                int "Speed limit (Hz)"
+                default 20000
+            config SPEED_LOOP_M2_MOVE_THRESHOLD
+                int "Move threshold (Hz)"
+                default 50
+            config SPEED_LOOP_M2_MAX_ACCEL
+                int "Max acceleration (Hz/period)"
+                default 200
+            config SPEED_LOOP_M2_KP
+                int "Kp (scaled x1000, 100=0.1)"
+                default 100
+            config SPEED_LOOP_M2_KI
+                int "Ki (scaled x1000, 200=0.2)"
+                default 200
+            config SPEED_LOOP_M2_KD
+                int "Kd (scaled x1000, 50=0.05)"
+                default 50
+        endmenu
+        endif
+
+        if SPEED_LOOP_MOTOR_COUNT >= 4
+        comment "---- Motor 3 Configuration ----"
+        menu "Motor 3"
+            config SPEED_LOOP_M3_TIM_INDEX
+                int "TIM index"
+                range 1 15
+                default 12
+            config SPEED_LOOP_M3_TIM_CH
+                int "TIM channel (1-4)"
+                range 1 4
+                default 1
+            config SPEED_LOOP_M3_TIM_CLK_HZ
+                int "TIM clock (Hz)"
+                default 200000000
+            config SPEED_LOOP_M3_PULSE_PORT_INDEX
+                int "Pulse GPIO port index"
+                range 0 10
+                default 4
+            config SPEED_LOOP_M3_PULSE_PIN
+                int "Pulse GPIO pin number"
+                range 0 15
+                default 5
+            config SPEED_LOOP_M3_PULSE_AF
+                int "Pulse GPIO alternate function"
+                range 0 15
+                default 2
+            config SPEED_LOOP_M3_DIR_PIN
+                int "Direction GPIO pin"
+                range 0 175
+                default 39
+            config SPEED_LOOP_M3_EN_PIN
+                int "Enable GPIO pin"
+                range 0 175
+                default 38
+            config SPEED_LOOP_M3_ENC_TIM_INDEX
+                int "Encoder TIM index"
+                range 1 15
+                default 4
+            config SPEED_LOOP_M3_ENC_CH1_PORT_INDEX
+                int "Encoder CH1 port index"
+                range 0 10
+                default 1
+            config SPEED_LOOP_M3_ENC_CH1_PIN
+                int "Encoder CH1 pin number"
+                range 0 15
+                default 6
+            config SPEED_LOOP_M3_ENC_CH1_AF
+                int "Encoder CH1 AF"
+                range 0 15
+                default 2
+            config SPEED_LOOP_M3_ENC_CH2_PORT_INDEX
+                int "Encoder CH2 port index"
+                range 0 10
+                default 1
+            config SPEED_LOOP_M3_ENC_CH2_PIN
+                int "Encoder CH2 pin number"
+                range 0 15
+                default 7
+            config SPEED_LOOP_M3_ENC_CH2_AF
+                int "Encoder CH2 AF"
+                range 0 15
+                default 2
+            config SPEED_LOOP_M3_CTRL_TIMER
+                string "Control hwtimer device"
+                default "timer13"
+            config SPEED_LOOP_M3_STEPS_PER_REV
+                int "Steps per revolution"
+                default 6400
+            config SPEED_LOOP_M3_ENC_COUNTS_PER_REV
+                int "Encoder counts per revolution"
+                default 4000
+            config SPEED_LOOP_M3_ENC_INVERT
+                int "Invert encoder direction (1=invert)"
+                range 0 1
+                default 1
+            config SPEED_LOOP_M3_SPEED_LIMIT
+                int "Speed limit (Hz)"
+                default 20000
+            config SPEED_LOOP_M3_MOVE_THRESHOLD
+                int "Move threshold (Hz)"
+                default 50
+            config SPEED_LOOP_M3_MAX_ACCEL
+                int "Max acceleration (Hz/period)"
+                default 200
+            config SPEED_LOOP_M3_KP
+                int "Kp (scaled x1000, 100=0.1)"
+                default 100
+            config SPEED_LOOP_M3_KI
+                int "Ki (scaled x1000, 200=0.2)"
+                default 200
+            config SPEED_LOOP_M3_KD
+                int "Kd (scaled x1000, 50=0.05)"
+                default 50
+        endmenu
+        endif
+
+        endif
+
+    menuconfig BSP_USING_STEPPER_POS_LOOP
+        bool "Enable Stepper Position-loop Control (Positional PID)"
+        select BSP_USING_TIM
+        select BSP_USING_TIM4
+        select RT_USING_HWTIMER
+        select RT_USING_PIN
+        select BSP_USING_STEPPER_COMMON
+        default n
+        if BSP_USING_STEPPER_POS_LOOP
+            config POS_LOOP_MOTOR_COUNT
+                int "Number of motors (1-4)"
+                range 1 4
+                default 1
+            config POS_LOOP_CTRL_PERIOD_US
+                int "Control period (us)"
+                default 20000
+
+        comment "---- Motor 0 ----"
+        menu "Motor0-Pos"
+            config POS_LOOP_M0_TIM_INDEX
+                int "TIM index (1=TIM1,2=TIM2...)"
+                range 1 15
+                default 2
+            config POS_LOOP_M0_TIM_CH
+                int "TIM channel (1-4)"
+                range 1 4
+                default 1
+            config POS_LOOP_M0_TIM_CLK_HZ
+                int "TIM clock (Hz)"
+                default 200000000
+            config POS_LOOP_M0_PULSE_PORT_INDEX
+                int "Pulse GPIO port (0=A..10=K)"
+                range 0 10
+                default 0
+            config POS_LOOP_M0_PULSE_PIN
+                int "Pulse pin number"
+                range 0 15
+                default 0
+            config POS_LOOP_M0_PULSE_AF
+                int "Pulse AF"
+                range 0 15
+                default 1
+            config POS_LOOP_M0_DIR_PIN
+                int "Direction pin"
+                range 0 175
+                default 33
+            config POS_LOOP_M0_EN_PIN
+                int "Enable pin"
+                range 0 175
+                default 32
+            config POS_LOOP_M0_ENC_TIM_INDEX
+                int "Encoder TIM index"
+                range 1 15
+                default 3
+            config POS_LOOP_M0_ENC_CH1_PORT_INDEX
+                int "Encoder CH1 port"
+                range 0 10
+                default 2
+            config POS_LOOP_M0_ENC_CH1_PIN
+                int "Encoder CH1 pin"
+                range 0 15
+                default 6
+            config POS_LOOP_M0_ENC_CH1_AF
+                int "Encoder CH1 AF"
+                range 0 15
+                default 2
+            config POS_LOOP_M0_ENC_CH2_PORT_INDEX
+                int "Encoder CH2 port"
+                range 0 10
+                default 2
+            config POS_LOOP_M0_ENC_CH2_PIN
+                int "Encoder CH2 pin"
+                range 0 15
+                default 7
+            config POS_LOOP_M0_ENC_CH2_AF
+                int "Encoder CH2 AF"
+                range 0 15
+                default 2
+            config POS_LOOP_M0_CTRL_TIMER
+                string "Control hwtimer"
+                default "timer4"
+            config POS_LOOP_M0_ENC_INVERT
+                int "Invert encoder (1=invert)"
+                range 0 1
+                default 1
+            config POS_LOOP_M0_SPEED_LIMIT
+                int "Positioning speed limit (Hz)"
+                default 20000
+            config POS_LOOP_M0_MOVE_THRESHOLD
+                int "Arrival dead zone (counts)"
+                default 20
+            config POS_LOOP_M0_MAX_ACCEL
+                int "Accel/Decel (Hz/period)"
+                default 500
+            config POS_LOOP_M0_RAMP_MAX_SPEED
+                int "Trapezoidal max speed (Hz)"
+                default 20000
+            config POS_LOOP_M0_KP
+                int "Kp (scaled x1000, 2000=2.0)"
+                default 2000
+            config POS_LOOP_M0_KI
+                int "Ki (scaled x1000, 200=0.2)"
+                default 200
+            config POS_LOOP_M0_KD
+                int "Kd (scaled x1000, 200=0.2)"
+                default 200
+        endmenu
+        endif
+
+endmenu
+
+endmenu
