@@ -1,9 +1,15 @@
-/*
- * 步进电机开环控制
+/**
+ * @file test_openloop.c
+ * @brief 步进电机开环控制 —— 测试例程
+ * @author hm
+ * @version 1.0
+ * @date 2026-06-13
  *
- *   stepol <Hz>        → 自动初始化+启动+设频率
- *   stepol 0           → 停止
- *   stepol_dir cw|ccw  → 换向
+ * @copyright Copyright (c) 2026, hm
+ *
+ * @logs:
+ * Date           Version     Author      Description
+ * 2026-06-13     v1.0        hm          the first version
  */
 
 #include <rtthread.h>
@@ -37,7 +43,7 @@ static int ensure_inited(void)
                            M1_TIM, M1_TIM_CH,
                            HAL_RCC_GetPCLK1Freq() * 2,
                            M1_PULSE_PORT, M1_PULSE_PIN, M1_PULSE_AF,
-                           M1_DIR_PIN, M1_EN_PIN, 0)) return -1;
+                           M1_DIR_PIN, M1_EN_PIN, -1, 0)) return -1;
     if (stepper_openloop_init(&g_ol, &g_motor, CTRL_TIMER,
                               CTRL_PERIOD, MAX_ACCEL)) return -1;
     g_inited = 1;

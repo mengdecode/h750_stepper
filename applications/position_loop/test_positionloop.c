@@ -1,19 +1,27 @@
-/*
- * 位置环电机控制 —— 测试例程
+/**
+ * @file test_positionloop.c
+ * @brief 位置环电机控制 —— 测试例程 & 配置
+ * @author hm
+ * @version 1.0
+ * @date 2026-06-13
+ *
+ * @copyright Copyright (c) 2026, hm
  *
  * 命令:
- *   posloop <motor_id> <counts>    → 定位到目标位置 (counts)
- *   posloop                        → 查看所有电机状态
- *   posloop_tune <motor_id> <kp> <ki> <kd> → 在线调参
- *   posloop_start <motor_id>       → 启动
- *   posloop_stop  <motor_id>       → 停止
+ *   posloop <id> [target]          → 定位 (整数=counts, 小数=物理单位)
+ *   posloop_home <id> [cw|ccw]    → 找零
+ *   posloop_tune <id> <kp> <ki> <kd> → 在线调参
+ *   posloop_start/stop <id>        → 启停
  *
- * 硬件配置通过 Kconfig 设置.
+ * @logs:
+ * Date           Version     Author      Description
+ * 2026-06-13     v1.0        hm          S-curve, scale, blocking API, homing, fault
  */
 
 #include <rtthread.h>
 #include <rtdevice.h>
 #include <stdlib.h>
+#include <string.h>
 #include <board.h>
 
 #include "../stepper_drv/stepper_pid_pos.h"
@@ -140,6 +148,31 @@ static rt_uint32_t tim_ch_from_index(int ch)
 #ifndef POS_LOOP_M0_KD
 #define POS_LOOP_M0_KD  200    /* scaled x1000: 0.2 */
 #endif
+#ifndef POS_LOOP_M0_S_CURVE_JERK
+#define POS_LOOP_M0_S_CURVE_JERK  (POS_LOOP_M0_MAX_ACCEL / 8)
+#endif
+#ifndef POS_LOOP_M0_FAULT_PIN
+#define POS_LOOP_M0_FAULT_PIN  GET_PIN(E,0)  /* PE0, 低电平有效, 内部上拉 */
+#endif
+#ifndef POS_LOOP_M0_HOME_PIN
+#define POS_LOOP_M0_HOME_PIN  GET_PIN(E,1)   /* PE1, 原点传感器 */
+#endif
+#ifndef POS_LOOP_M0_BRAKE_DECEL
+#define POS_LOOP_M0_BRAKE_DECEL  1000  /* 急停减速率 (Hz/周期) */
+#endif
+#ifndef POS_LOOP_M0_COUNTS_PER_UNIT
+/* 100转=1mm: PPR×4×减速比/导程 = 1000×4×100/1 = 400000 counts/mm */
+#define POS_LOOP_M0_COUNTS_PER_UNIT  400000.0f
+#endif
+#ifndef POS_LOOP_M0_UNIT_NAME
+#define POS_LOOP_M0_UNIT_NAME  "mm"
+#endif
+#ifndef POS_LOOP_M0_POS_MIN
+#define POS_LOOP_M0_POS_MIN  0.0f
+#endif
+#ifndef POS_LOOP_M0_POS_MAX
+#define POS_LOOP_M0_POS_MAX  100.0f
+#endif
 
 /* M1~3 默认复制 M0 */
 #ifndef POS_LOOP_M1_TIM_INDEX
@@ -168,6 +201,14 @@ static rt_uint32_t tim_ch_from_index(int ch)
 #define POS_LOOP_M1_KP  POS_LOOP_M0_KP
 #define POS_LOOP_M1_KI  POS_LOOP_M0_KI
 #define POS_LOOP_M1_KD  POS_LOOP_M0_KD
+#define POS_LOOP_M1_S_CURVE_JERK  POS_LOOP_M0_S_CURVE_JERK
+#define POS_LOOP_M1_FAULT_PIN  POS_LOOP_M0_FAULT_PIN
+#define POS_LOOP_M1_HOME_PIN  POS_LOOP_M0_HOME_PIN
+#define POS_LOOP_M1_BRAKE_DECEL  POS_LOOP_M0_BRAKE_DECEL
+#define POS_LOOP_M1_POS_MIN  POS_LOOP_M0_POS_MIN
+#define POS_LOOP_M1_POS_MAX  POS_LOOP_M0_POS_MAX
+#define POS_LOOP_M1_COUNTS_PER_UNIT  POS_LOOP_M0_COUNTS_PER_UNIT
+#define POS_LOOP_M1_UNIT_NAME  POS_LOOP_M0_UNIT_NAME
 #endif
 
 #ifndef POS_LOOP_M2_TIM_INDEX
@@ -196,6 +237,9 @@ static rt_uint32_t tim_ch_from_index(int ch)
 #define POS_LOOP_M2_KP  POS_LOOP_M0_KP
 #define POS_LOOP_M2_KI  POS_LOOP_M0_KI
 #define POS_LOOP_M2_KD  POS_LOOP_M0_KD
+#define POS_LOOP_M2_S_CURVE_JERK  POS_LOOP_M0_S_CURVE_JERK
+#define POS_LOOP_M2_FAULT_PIN  POS_LOOP_M0_FAULT_PIN
+#define POS_LOOP_M2_BRAKE_DECEL  POS_LOOP_M0_BRAKE_DECEL
 #endif
 
 #ifndef POS_LOOP_M3_TIM_INDEX
@@ -224,6 +268,9 @@ static rt_uint32_t tim_ch_from_index(int ch)
 #define POS_LOOP_M3_KP  POS_LOOP_M0_KP
 #define POS_LOOP_M3_KI  POS_LOOP_M0_KI
 #define POS_LOOP_M3_KD  POS_LOOP_M0_KD
+#define POS_LOOP_M3_S_CURVE_JERK  POS_LOOP_M0_S_CURVE_JERK
+#define POS_LOOP_M3_FAULT_PIN  POS_LOOP_M0_FAULT_PIN
+#define POS_LOOP_M3_BRAKE_DECEL  POS_LOOP_M0_BRAKE_DECEL
 #endif
 
 /* ---- 配置结构体 ---- */
@@ -237,40 +284,163 @@ typedef struct {
     const char *ctrl_timer;
     int enc_invert;
     int dir_invert;
-    float speed_limit, move_threshold, max_accel, ramp_max_speed;
+    float speed_limit, move_threshold, max_accel, s_curve_jerk, ramp_max_speed;
     int kp, ki, kd;
+    int fault_pin, home_pin, brake_decel;
+    float counts_per_unit;
+    const char *unit_name;
+    float pos_min, pos_max;
 } pl_hw_cfg_t;
-
-/* 展开宏 */
-#define PL_XCONFIG(N) {                              \
-    POS_LOOP_M##N##_TIM_INDEX, POS_LOOP_M##N##_TIM_CH,\
-    POS_LOOP_M##N##_TIM_CLK_HZ,                      \
-    POS_LOOP_M##N##_PULSE_PORT_INDEX, POS_LOOP_M##N##_PULSE_PIN,\
-    POS_LOOP_M##N##_PULSE_AF,                        \
-    POS_LOOP_M##N##_DIR_PIN, POS_LOOP_M##N##_EN_PIN, \
-    POS_LOOP_M##N##_ENC_TIM_INDEX,                   \
-    POS_LOOP_M##N##_ENC_CH1_PORT_INDEX, POS_LOOP_M##N##_ENC_CH1_PIN,\
-    POS_LOOP_M##N##_ENC_CH1_AF,                      \
-    POS_LOOP_M##N##_ENC_CH2_PORT_INDEX, POS_LOOP_M##N##_ENC_CH2_PIN,\
-    POS_LOOP_M##N##_ENC_CH2_AF,                      \
-    POS_LOOP_M##N##_CTRL_TIMER, POS_LOOP_M##N##_ENC_INVERT,\
-    POS_LOOP_M##N##_DIR_INVERT,\
-    POS_LOOP_M##N##_SPEED_LIMIT, POS_LOOP_M##N##_MOVE_THRESHOLD,\
-    POS_LOOP_M##N##_MAX_ACCEL, POS_LOOP_M##N##_RAMP_MAX_SPEED,\
-    POS_LOOP_M##N##_KP, POS_LOOP_M##N##_KI, POS_LOOP_M##N##_KD }
 
 #define PL_MAX_MOTORS  POS_LOOP_MOTOR_COUNT
 
 static const pl_hw_cfg_t g_pl_cfg[PL_MAX_MOTORS] = {
-    PL_XCONFIG(0),
+    /* ---- 电机 0 ---- */
+    [0] = {
+        .tim_index       = POS_LOOP_M0_TIM_INDEX,
+        .tim_ch          = POS_LOOP_M0_TIM_CH,
+        .tim_clk_hz      = POS_LOOP_M0_TIM_CLK_HZ,
+        .pulse_port_idx  = POS_LOOP_M0_PULSE_PORT_INDEX,
+        .pulse_pin       = POS_LOOP_M0_PULSE_PIN,
+        .pulse_af        = POS_LOOP_M0_PULSE_AF,
+        .dir_pin         = POS_LOOP_M0_DIR_PIN,
+        .en_pin          = POS_LOOP_M0_EN_PIN,
+        .enc_tim_index   = POS_LOOP_M0_ENC_TIM_INDEX,
+        .enc_ch1_port_idx = POS_LOOP_M0_ENC_CH1_PORT_INDEX,
+        .enc_ch1_pin     = POS_LOOP_M0_ENC_CH1_PIN,
+        .enc_ch1_af      = POS_LOOP_M0_ENC_CH1_AF,
+        .enc_ch2_port_idx = POS_LOOP_M0_ENC_CH2_PORT_INDEX,
+        .enc_ch2_pin     = POS_LOOP_M0_ENC_CH2_PIN,
+        .enc_ch2_af      = POS_LOOP_M0_ENC_CH2_AF,
+        .ctrl_timer      = POS_LOOP_M0_CTRL_TIMER,
+        .enc_invert      = POS_LOOP_M0_ENC_INVERT,
+        .dir_invert      = POS_LOOP_M0_DIR_INVERT,
+        .speed_limit     = POS_LOOP_M0_SPEED_LIMIT,
+        .move_threshold  = POS_LOOP_M0_MOVE_THRESHOLD,
+        .max_accel       = POS_LOOP_M0_MAX_ACCEL,
+        .s_curve_jerk    = POS_LOOP_M0_S_CURVE_JERK,
+        .ramp_max_speed  = POS_LOOP_M0_RAMP_MAX_SPEED,
+        .kp              = POS_LOOP_M0_KP,
+        .ki              = POS_LOOP_M0_KI,
+        .kd              = POS_LOOP_M0_KD,
+        .fault_pin       = POS_LOOP_M0_FAULT_PIN,
+        .home_pin        = POS_LOOP_M0_HOME_PIN,
+        .brake_decel     = POS_LOOP_M0_BRAKE_DECEL,
+        .counts_per_unit = POS_LOOP_M0_COUNTS_PER_UNIT,
+        .unit_name       = POS_LOOP_M0_UNIT_NAME,
+        .pos_min         = POS_LOOP_M0_POS_MIN,
+        .pos_max         = POS_LOOP_M0_POS_MAX,
+    },
 #if PL_MAX_MOTORS >= 2
-    PL_XCONFIG(1),
+    /* ---- 电机 1 ---- */
+    [1] = {
+        .tim_index       = POS_LOOP_M1_TIM_INDEX,
+        .tim_ch          = POS_LOOP_M1_TIM_CH,
+        .tim_clk_hz      = POS_LOOP_M1_TIM_CLK_HZ,
+        .pulse_port_idx  = POS_LOOP_M1_PULSE_PORT_INDEX,
+        .pulse_pin       = POS_LOOP_M1_PULSE_PIN,
+        .pulse_af        = POS_LOOP_M1_PULSE_AF,
+        .dir_pin         = POS_LOOP_M1_DIR_PIN,
+        .en_pin          = POS_LOOP_M1_EN_PIN,
+        .enc_tim_index   = POS_LOOP_M1_ENC_TIM_INDEX,
+        .enc_ch1_port_idx = POS_LOOP_M1_ENC_CH1_PORT_INDEX,
+        .enc_ch1_pin     = POS_LOOP_M1_ENC_CH1_PIN,
+        .enc_ch1_af      = POS_LOOP_M1_ENC_CH1_AF,
+        .enc_ch2_port_idx = POS_LOOP_M1_ENC_CH2_PORT_INDEX,
+        .enc_ch2_pin     = POS_LOOP_M1_ENC_CH2_PIN,
+        .enc_ch2_af      = POS_LOOP_M1_ENC_CH2_AF,
+        .ctrl_timer      = POS_LOOP_M1_CTRL_TIMER,
+        .enc_invert      = POS_LOOP_M1_ENC_INVERT,
+        .dir_invert      = POS_LOOP_M1_DIR_INVERT,
+        .speed_limit     = POS_LOOP_M1_SPEED_LIMIT,
+        .move_threshold  = POS_LOOP_M1_MOVE_THRESHOLD,
+        .max_accel       = POS_LOOP_M1_MAX_ACCEL,
+        .s_curve_jerk    = POS_LOOP_M1_S_CURVE_JERK,
+        .ramp_max_speed  = POS_LOOP_M1_RAMP_MAX_SPEED,
+        .kp              = POS_LOOP_M1_KP,
+        .ki              = POS_LOOP_M1_KI,
+        .kd              = POS_LOOP_M1_KD,
+        .fault_pin       = POS_LOOP_M1_FAULT_PIN,
+        .brake_decel     = POS_LOOP_M1_BRAKE_DECEL,
+        .counts_per_unit = POS_LOOP_M1_COUNTS_PER_UNIT,
+        .unit_name       = POS_LOOP_M1_UNIT_NAME,
+        .pos_min         = POS_LOOP_M1_POS_MIN,
+        .pos_max         = POS_LOOP_M1_POS_MAX,
+    },
 #endif
 #if PL_MAX_MOTORS >= 3
-    PL_XCONFIG(2),
+    /* ---- 电机 2 ---- */
+    [2] = {
+        .tim_index       = POS_LOOP_M2_TIM_INDEX,
+        .tim_ch          = POS_LOOP_M2_TIM_CH,
+        .tim_clk_hz      = POS_LOOP_M2_TIM_CLK_HZ,
+        .pulse_port_idx  = POS_LOOP_M2_PULSE_PORT_INDEX,
+        .pulse_pin       = POS_LOOP_M2_PULSE_PIN,
+        .pulse_af        = POS_LOOP_M2_PULSE_AF,
+        .dir_pin         = POS_LOOP_M2_DIR_PIN,
+        .en_pin          = POS_LOOP_M2_EN_PIN,
+        .enc_tim_index   = POS_LOOP_M2_ENC_TIM_INDEX,
+        .enc_ch1_port_idx = POS_LOOP_M2_ENC_CH1_PORT_INDEX,
+        .enc_ch1_pin     = POS_LOOP_M2_ENC_CH1_PIN,
+        .enc_ch1_af      = POS_LOOP_M2_ENC_CH1_AF,
+        .enc_ch2_port_idx = POS_LOOP_M2_ENC_CH2_PORT_INDEX,
+        .enc_ch2_pin     = POS_LOOP_M2_ENC_CH2_PIN,
+        .enc_ch2_af      = POS_LOOP_M2_ENC_CH2_AF,
+        .ctrl_timer      = POS_LOOP_M2_CTRL_TIMER,
+        .enc_invert      = POS_LOOP_M2_ENC_INVERT,
+        .dir_invert      = POS_LOOP_M2_DIR_INVERT,
+        .speed_limit     = POS_LOOP_M2_SPEED_LIMIT,
+        .move_threshold  = POS_LOOP_M2_MOVE_THRESHOLD,
+        .max_accel       = POS_LOOP_M2_MAX_ACCEL,
+        .s_curve_jerk    = POS_LOOP_M2_S_CURVE_JERK,
+        .ramp_max_speed  = POS_LOOP_M2_RAMP_MAX_SPEED,
+        .kp              = POS_LOOP_M2_KP,
+        .ki              = POS_LOOP_M2_KI,
+        .kd              = POS_LOOP_M2_KD,
+        .fault_pin       = POS_LOOP_M2_FAULT_PIN,
+        .brake_decel     = POS_LOOP_M2_BRAKE_DECEL,
+        .counts_per_unit = POS_LOOP_M2_COUNTS_PER_UNIT,
+        .unit_name       = POS_LOOP_M2_UNIT_NAME,
+        .pos_min         = POS_LOOP_M2_POS_MIN,
+        .pos_max         = POS_LOOP_M2_POS_MAX,
+    },
 #endif
 #if PL_MAX_MOTORS >= 4
-    PL_XCONFIG(3),
+    /* ---- 电机 3 ---- */
+    [3] = {
+        .tim_index       = POS_LOOP_M3_TIM_INDEX,
+        .tim_ch          = POS_LOOP_M3_TIM_CH,
+        .tim_clk_hz      = POS_LOOP_M3_TIM_CLK_HZ,
+        .pulse_port_idx  = POS_LOOP_M3_PULSE_PORT_INDEX,
+        .pulse_pin       = POS_LOOP_M3_PULSE_PIN,
+        .pulse_af        = POS_LOOP_M3_PULSE_AF,
+        .dir_pin         = POS_LOOP_M3_DIR_PIN,
+        .en_pin          = POS_LOOP_M3_EN_PIN,
+        .enc_tim_index   = POS_LOOP_M3_ENC_TIM_INDEX,
+        .enc_ch1_port_idx = POS_LOOP_M3_ENC_CH1_PORT_INDEX,
+        .enc_ch1_pin     = POS_LOOP_M3_ENC_CH1_PIN,
+        .enc_ch1_af      = POS_LOOP_M3_ENC_CH1_AF,
+        .enc_ch2_port_idx = POS_LOOP_M3_ENC_CH2_PORT_INDEX,
+        .enc_ch2_pin     = POS_LOOP_M3_ENC_CH2_PIN,
+        .enc_ch2_af      = POS_LOOP_M3_ENC_CH2_AF,
+        .ctrl_timer      = POS_LOOP_M3_CTRL_TIMER,
+        .enc_invert      = POS_LOOP_M3_ENC_INVERT,
+        .dir_invert      = POS_LOOP_M3_DIR_INVERT,
+        .speed_limit     = POS_LOOP_M3_SPEED_LIMIT,
+        .move_threshold  = POS_LOOP_M3_MOVE_THRESHOLD,
+        .max_accel       = POS_LOOP_M3_MAX_ACCEL,
+        .s_curve_jerk    = POS_LOOP_M3_S_CURVE_JERK,
+        .ramp_max_speed  = POS_LOOP_M3_RAMP_MAX_SPEED,
+        .kp              = POS_LOOP_M3_KP,
+        .ki              = POS_LOOP_M3_KI,
+        .kd              = POS_LOOP_M3_KD,
+        .fault_pin       = POS_LOOP_M3_FAULT_PIN,
+        .brake_decel     = POS_LOOP_M3_BRAKE_DECEL,
+        .counts_per_unit = POS_LOOP_M3_COUNTS_PER_UNIT,
+        .unit_name       = POS_LOOP_M3_UNIT_NAME,
+        .pos_min         = POS_LOOP_M3_POS_MIN,
+        .pos_max         = POS_LOOP_M3_POS_MAX,
+    },
 #endif
 };
 
@@ -293,7 +463,12 @@ static int ensure_inited(int id)
             cfg->tim_clk_hz, gpio_from_index(cfg->pulse_port_idx),
             (rt_uint16_t)cfg->pulse_pin, (rt_uint8_t)cfg->pulse_af,
             (rt_base_t)cfg->dir_pin, (rt_base_t)cfg->en_pin,
-            cfg->dir_invert);
+            (rt_base_t)cfg->fault_pin, cfg->dir_invert);
+    /* 配置制动参数 */
+    if (ret == RT_EOK) {
+        g_pl_motors[id].brake_decel = (rt_uint32_t)cfg->brake_decel;
+        stepper_motor_driver_set_idle_reduce(&g_pl_motors[id], 1, 1000);
+    }
     if (ret) { LOG_E("M%d motor failed", id); return -1; }
 
     ret = stepper_encoder_driver_init(&g_pl_encoders[id],
@@ -311,7 +486,9 @@ static int ensure_inited(int id)
     ret = position_loop_init(&g_pl[id], &g_pl_motors[id], &g_pl_encoders[id],
             &g_pl_pids[id], cfg->ctrl_timer, POS_LOOP_CTRL_PERIOD_US,
             cfg->enc_invert, cfg->speed_limit, cfg->move_threshold,
-            cfg->max_accel, cfg->ramp_max_speed);
+            cfg->max_accel, cfg->s_curve_jerk, cfg->ramp_max_speed,
+            cfg->counts_per_unit, cfg->unit_name,
+            cfg->pos_min, cfg->pos_max);
     if (ret) { LOG_E("M%d pl init failed", id); return -1; }
 
     g_pl_inited[id] = 1;
@@ -320,37 +497,59 @@ static int ensure_inited(int id)
     return 0;
 }
 
-/* ---- posloop [motor_id] [counts] ---- */
+/* ---- posloop [motor_id] [target] ----
+ *   target 带小数点 → 物理单位; 纯整数 → counts */
 static int cmd_posloop(int argc, char *argv[])
 {
-    int id; rt_int32_t target;
+    int id;
     if (argc < 2) {
         for (int i = 0; i < PL_MAX_MOTORS; i++) {
             if (!g_pl_inited[i]) rt_kprintf("M%d: not inited\n", i);
-            else rt_kprintf("M%d: run=%s  pos=%ld  target=%ld  err=%.0f  out=%.1fHz\n",
-                    i, position_loop_is_running(&g_pl[i]) ? "Y":"N",
-                    (long)position_loop_get_position(&g_pl[i]),
-                    (long)g_pl[i].target_pos,
-                    (double)(g_pl[i].target_pos - g_pl[i].current_pos),
-                    (double)g_pl[i].output_freq);
+            else {
+                float p = position_loop_get_position_physical(&g_pl[i]);
+                float t = position_scale_to_physical(&g_pl[i].scale,
+                                                     g_pl[i].target_pos);
+                rt_kprintf("M%d: run=%s  pos=%.1f%s  target=%.1f%s  "
+                           "err=%.1f%s  out=%.0fHz\n",
+                           i, position_loop_is_running(&g_pl[i]) ? "Y":"N",
+                           (double)p, g_pl[i].scale.unit,
+                           (double)t, g_pl[i].scale.unit,
+                           (double)(t - p), g_pl[i].scale.unit,
+                           (double)g_pl[i].output_freq);
+            }
         }
         return 0;
     }
     id = atoi(argv[1]);
     if (ensure_inited(id)) return -1;
     if (argc < 3) {
-        LOG_I("M%d: pos=%ld  target=%ld  arrived=%s", id,
-              (long)position_loop_get_position(&g_pl[id]),
-              (long)g_pl[id].target_pos,
+        float pf = position_loop_get_position_physical(&g_pl[id]);
+        LOG_I("M%d: pos=%.1f%s  arrived=%s", id,
+              (double)pf, g_pl[id].scale.unit,
               position_loop_is_arrived(&g_pl[id]) ? "Y":"N");
         return 0;
     }
-    target = (rt_int32_t)atol(argv[2]);
     if (!position_loop_is_running(&g_pl[id]))
         position_loop_start(&g_pl[id]);
-    position_loop_set_target(&g_pl[id], target);
-    LOG_I("M%d -> %ld counts", id, (long)target);
-    return 0;
+
+    /* 含小数点 → 物理单位; 纯整数 → counts */
+    int ret;
+    if (strchr(argv[2], '.') != RT_NULL) {
+        float target_f = (float)atof(argv[2]);
+        LOG_I("M%d -> %.1f%s", id, (double)target_f, g_pl[id].scale.unit);
+        ret = position_loop_move_to_physical(&g_pl[id], target_f, 0);
+    } else {
+        rt_int32_t target = (rt_int32_t)atol(argv[2]);
+        LOG_I("M%d -> %ld counts", id, (long)target);
+        ret = position_loop_move_to(&g_pl[id], target, 0);
+    }
+    if (ret == MOTOR_E_OK)
+        LOG_I("M%d arrived  pos=%.1f%s", id,
+              (double)position_loop_get_position_physical(&g_pl[id]),
+              g_pl[id].scale.unit);
+    else
+        LOG_E("M%d move failed  err=%d", id, ret);
+    return ret;
 }
 MSH_CMD_EXPORT(cmd_posloop, posloop [motor_id] [counts]);
 
@@ -384,3 +583,39 @@ static int cmd_posloop_stop(int argc, char *argv[])
     position_loop_stop(&g_pl[id]); LOG_I("M%d stopped", id); return 0;
 }
 MSH_CMD_EXPORT(cmd_posloop_stop, posloop_stop id);
+
+/* ---- posloop_home <id> [cw|ccw] [speed_hz] ---- */
+static int cmd_posloop_home(int argc, char *argv[])
+{
+    int id, home_dir = MOTOR_DIR_CW;
+    rt_base_t home_pin;
+    rt_uint32_t speed = 2000;
+
+    if (argc < 2) {
+        rt_kprintf("usage: posloop_home <id> [cw|ccw] [speed_hz]\n");
+        return -1;
+    }
+    id = atoi(argv[1]);
+    if (ensure_inited(id)) return -1;
+    home_pin = (rt_base_t)g_pl_cfg[id].home_pin;
+    if (argc >= 3) {
+        if (rt_strcmp(argv[2], "ccw") == 0) home_dir = MOTOR_DIR_CCW;
+    }
+    if (argc >= 4) speed = (rt_uint32_t)atol(argv[3]);
+
+    LOG_I("M%d homing  pin=%d dir=%s speed=%luHz",
+          id, (int)home_pin, home_dir == MOTOR_DIR_CW ? "CW" : "CCW",
+          (unsigned long)speed);
+
+    if (!position_loop_is_running(&g_pl[id]))
+        position_loop_start(&g_pl[id]);
+
+    int ret = position_loop_home(&g_pl[id], &g_pl_encoders[id],
+                                  home_pin, home_dir, speed, 30000);
+    if (ret == MOTOR_E_OK)
+        LOG_I("M%d home OK  pos=0", id);
+    else
+        LOG_E("M%d home failed  err=%d", id, ret);
+    return ret;
+}
+MSH_CMD_EXPORT(cmd_posloop_home, posloop_home id [home_pin] [cw|ccw] [speed_hz]);

@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(grep -n \"SPEED_LOOP_M3_KD\\\\|endif.*endif\\\\|endmenu.*External\\\\|endif.*endif.*endif\\\\|^\\\\s*endif\\\\s*$\" /c/Users/hhhhe/Downloads/rt-thread-5.2.2/bsp/stm32/stm32h750-artpi/dist/project/board/Kconfig)",
-      "mcp__ide__executeCode"
+      "mcp__ide__executeCode",
+      "Bash(grep -rn \" */$\" \"C:/RT-ThreadStudio/workspace/h750_stepper/applications\" --include=\"*.c\" --include=\"*.h\")"
     ]
   }
 }

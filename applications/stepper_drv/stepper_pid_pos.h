@@ -1,18 +1,15 @@
-/*
- * 位置式 PID 控制器 —— 纯算法模块，无任何硬件依赖
+/**
+ * @file stepper_pid_pos.h
+ * @brief 位置式 PID 控制器 —— 纯算法模块, 无硬件依赖
+ * @author hm
+ * @version 1.0
+ * @date 2026-06-13
  *
- * 公式: u(k) = Kp*e(k) + Ki*Σe + Kd*(e(k)-e(k-1))
+ * @copyright Copyright (c) 2026, hm
  *
- * 与增量式的区别:
- *   - 增量式: 输出 Δu, 由调用者累加
- *   - 位置式: 输出绝对值 u(k), 直接作为控制量
- *
- * 使用方式（多实例安全）:
- *   stepper_pid_pos_t pid;
- *   stepper_pid_pos_init(&pid, 0.1, 0.01, 0, 20000, 20000);
- *   stepper_pid_pos_set_target(&pid, 5000);
- *   float out = stepper_pid_pos_calculate(&pid, actual_value);
- *   // out 即目标频率 (Hz)，直接传给电机
+ * @logs:
+ * Date           Version     Author      Description
+ * 2026-06-13     v1.0        hm          the first version
  */
 
 #ifndef STEPPER_PID_POS_H__

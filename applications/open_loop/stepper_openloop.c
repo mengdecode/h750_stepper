@@ -1,5 +1,15 @@
-/*
- * 开环速度控制器实现 —— 无编码器, 仅斜坡限速 + PWM 频率输出
+/**
+ * @file stepper_openloop.c
+ * @brief 开环速度控制器实现 —— 无编码器, 斜坡限速 + PWM 频率输出
+ * @author hm
+ * @version 1.0
+ * @date 2026-06-13
+ *
+ * @copyright Copyright (c) 2026, hm
+ *
+ * @logs:
+ * Date           Version     Author      Description
+ * 2026-06-13     v1.0        hm          the first version
  */
 
 #include "stepper_openloop.h"

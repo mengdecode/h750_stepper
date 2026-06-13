@@ -138,7 +138,7 @@
           </Flash1>
           <bUseTDR>1</bUseTDR>
           <Flash2>BIN\UL2CM3.DLL</Flash2>
-          <Flash3>"" ()</Flash3>
+          <Flash3></Flash3>
           <Flash4></Flash4>
           <pFcarmOut></pFcarmOut>
           <pFcarmGrp></pFcarmGrp>
@@ -337,9 +337,9 @@
             <v6Rtti>0</v6Rtti>
             <VariousControls>
               <MiscControls></MiscControls>
-              <Define>RT_USING_ARMLIBC, __CLK_TCK=RT_TICK_PER_SECOND, STM32H750xx, RT_USING_LIBC, USE_HAL_DRIVER, __STDC_LIMIT_MACROS, __RTTHREAD__</Define>
+              <Define>RT_USING_ARMLIBC, __STDC_LIMIT_MACROS, __CLK_TCK=RT_TICK_PER_SECOND, STM32H750xx, USE_HAL_DRIVER, RT_USING_LIBC, __RTTHREAD__</Define>
               <Undefine></Undefine>
-              <IncludePath>rt-thread\components\libc\posix\io\poll;rt-thread\components\libc\compilers\common\extension\fcntl\octal;rt-thread\components\drivers\include;rt-thread\components\drivers\phy;rt-thread\components\drivers\include;rt-thread\components\drivers\include;packages\stm32h7_cmsis_driver-latest\Include;packages\CmBacktrace-latest;libraries\HAL_Drivers;applications;rt-thread\components\libc\posix\io\eventfd;applications\stepper_drv;rt-thread\components\libc\posix\ipc;rt-thread\components\drivers\smp_call;applications\stepper_drv;applications\position_loop;rt-thread\components\drivers\include;rt-thread\components\drivers\include;rt-thread\components\libc\compilers\common\include;rt-thread\components\drivers\spi;board\CubeMX_Config\Inc;applications\stepper_drv;rt-thread\components\utilities\ulog;rt-thread\components\net\utest;board;.;rt-thread\libcpu\arm\common;rt-thread\components\drivers\include;rt-thread\libcpu\arm\cortex-m7;applications\speed_loop;rt-thread\components\drivers\include;rt-thread\include;rt-thread\components\drivers\include;rt-thread\components\libc\compilers\common\extension;rt-thread\components\libc\posix\io\epoll;rt-thread\components\drivers\include;applications\open_loop;packages\CMSIS-Core-latest\Include;libraries\HAL_Drivers\drivers;libraries\HAL_Drivers\drivers\config;packages\stm32h7_hal_driver-latest\Inc;applications\stepper_drv;packages\stm32h7_hal_driver-latest\Inc\Legacy;rt-thread\components\finsh;rt-thread\components\drivers\include;rt-thread\components\drivers\touch</IncludePath>
+              <IncludePath>applications\speed_loop;rt-thread\components\drivers\include;libraries\HAL_Drivers\drivers\config;.;rt-thread\components\drivers\include;rt-thread\components\drivers\include;applications\stepper_drv;rt-thread\libcpu\arm\cortex-m7;rt-thread\components\drivers\smp_call;rt-thread\components\drivers\include;rt-thread\components\libc\compilers\common\include;packages\CMSIS-Core-latest\Include;rt-thread\components\net\utest;rt-thread\components\drivers\include;rt-thread\components\drivers\spi;rt-thread\libcpu\arm\common;rt-thread\components\libc\posix\ipc;libraries\HAL_Drivers\drivers;packages\stm32h7_hal_driver-latest\Inc\Legacy;rt-thread\components\drivers\include;rt-thread\include;rt-thread\components\libc\compilers\common\extension;board\CubeMX_Config\Inc;packages\stm32h7_hal_driver-latest\Inc;applications\stepper_drv;rt-thread\components\finsh;rt-thread\components\drivers\include;rt-thread\components\drivers\phy;rt-thread\components\drivers\include;rt-thread\components\drivers\touch;packages\CmBacktrace-latest;rt-thread\components\drivers\include;rt-thread\components\libc\posix\io\eventfd;rt-thread\components\libc\posix\io\poll;applications\open_loop;applications\position_loop;applications\stepper_drv;rt-thread\components\utilities\ulog;rt-thread\components\drivers\include;applications\stepper_drv;rt-thread\components\libc\posix\io\epoll;packages\stm32h7_cmsis_driver-latest\Include;board;libraries\HAL_Drivers;applications;rt-thread\components\libc\compilers\common\extension\fcntl\octal</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -399,14 +399,14 @@
               <FilePath>packages\CmBacktrace-latest\cmb_port.c</FilePath>
             </File>
             <File>
-              <FileName>cmb_flash_log.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>packages\CmBacktrace-latest\cmb_flash_log.c</FilePath>
-            </File>
-            <File>
               <FileName>cm_backtrace.c</FileName>
               <FileType>1</FileType>
               <FilePath>packages\CmBacktrace-latest\cm_backtrace.c</FilePath>
+            </File>
+            <File>
+              <FileName>cmb_flash_log.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>packages\CmBacktrace-latest\cmb_flash_log.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -1690,6 +1690,11 @@
           <GroupName>Finsh</GroupName>
           <Files>
             <File>
+              <FileName>msh.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>rt-thread\components\finsh\msh.c</FilePath>
+            </File>
+            <File>
               <FileName>cmd.c</FileName>
               <FileType>1</FileType>
               <FilePath>rt-thread\components\finsh\cmd.c</FilePath>
@@ -1698,11 +1703,6 @@
               <FileName>shell.c</FileName>
               <FileType>1</FileType>
               <FilePath>rt-thread\components\finsh\shell.c</FilePath>
-            </File>
-            <File>
-              <FileName>msh.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>rt-thread\components\finsh\msh.c</FilePath>
             </File>
             <File>
               <FileName>msh_parse.c</FileName>
@@ -2560,19 +2560,9 @@
           <GroupName>klibc</GroupName>
           <Files>
             <File>
-              <FileName>rt_vsscanf.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>rt-thread\src\klibc\rt_vsscanf.c</FilePath>
-            </File>
-            <File>
               <FileName>kstring.c</FileName>
               <FileType>1</FileType>
               <FilePath>rt-thread\src\klibc\kstring.c</FilePath>
-            </File>
-            <File>
-              <FileName>rt_vsnprintf_std.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>rt-thread\src\klibc\rt_vsnprintf_std.c</FilePath>
             </File>
             <File>
               <FileName>kerrno.c</FileName>
@@ -2583,6 +2573,16 @@
               <FileName>kstdio.c</FileName>
               <FileType>1</FileType>
               <FilePath>rt-thread\src\klibc\kstdio.c</FilePath>
+            </File>
+            <File>
+              <FileName>rt_vsscanf.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>rt-thread\src\klibc\rt_vsscanf.c</FilePath>
+            </File>
+            <File>
+              <FileName>rt_vsnprintf_std.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>rt-thread\src\klibc\rt_vsnprintf_std.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -2625,14 +2625,14 @@
           <GroupName>position_loop</GroupName>
           <Files>
             <File>
-              <FileName>position_loop.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>applications\position_loop\position_loop.c</FilePath>
-            </File>
-            <File>
               <FileName>test_positionloop.c</FileName>
               <FileType>1</FileType>
               <FilePath>applications\position_loop\test_positionloop.c</FilePath>
+            </File>
+            <File>
+              <FileName>position_loop.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>applications\position_loop\position_loop.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -2655,19 +2655,24 @@
           <GroupName>stepper_common</GroupName>
           <Files>
             <File>
+              <FileName>stepper_encoder_driver.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>applications\stepper_drv\stepper_encoder_driver.c</FilePath>
+            </File>
+            <File>
               <FileName>stepper_pid_pos.c</FileName>
               <FileType>1</FileType>
               <FilePath>applications\stepper_drv\stepper_pid_pos.c</FilePath>
             </File>
             <File>
+              <FileName>position_scale.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>applications\stepper_drv\position_scale.c</FilePath>
+            </File>
+            <File>
               <FileName>stepper_motor_driver.c</FileName>
               <FileType>1</FileType>
               <FilePath>applications\stepper_drv\stepper_motor_driver.c</FilePath>
-            </File>
-            <File>
-              <FileName>stepper_encoder_driver.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>applications\stepper_drv\stepper_encoder_driver.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -2705,14 +2710,64 @@
           <GroupName>STM32H7-HAL</GroupName>
           <Files>
             <File>
+              <FileName>stm32h7xx_hal_cortex.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_cortex.c</FilePath>
+            </File>
+            <File>
+              <FileName>stm32h7xx_hal_pwr.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_pwr.c</FilePath>
+            </File>
+            <File>
+              <FileName>stm32h7xx_hal_crc.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_crc.c</FilePath>
+            </File>
+            <File>
+              <FileName>stm32h7xx_hal_lptim.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_lptim.c</FilePath>
+            </File>
+            <File>
+              <FileName>stm32h7xx_hal_cryp.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_cryp.c</FilePath>
+            </File>
+            <File>
+              <FileName>stm32h7xx_hal_rng.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_rng.c</FilePath>
+            </File>
+            <File>
+              <FileName>stm32h7xx_hal_cryp_ex.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_cryp_ex.c</FilePath>
+            </File>
+            <File>
+              <FileName>stm32h7xx_hal_comp.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_comp.c</FilePath>
+            </File>
+            <File>
               <FileName>stm32h7xx_hal.c</FileName>
               <FileType>1</FileType>
               <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal.c</FilePath>
             </File>
             <File>
-              <FileName>stm32h7xx_hal_cortex.c</FileName>
+              <FileName>stm32h7xx_hal_pwr_ex.c</FileName>
               <FileType>1</FileType>
-              <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_cortex.c</FilePath>
+              <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_pwr_ex.c</FilePath>
+            </File>
+            <File>
+              <FileName>stm32h7xx_hal_sram.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_sram.c</FilePath>
+            </File>
+            <File>
+              <FileName>stm32h7xx_hal_qspi.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_qspi.c</FilePath>
             </File>
             <File>
               <FileName>stm32h7xx_hal_uart.c</FileName>
@@ -2725,74 +2780,9 @@
               <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_dma.c</FilePath>
             </File>
             <File>
-              <FileName>stm32h7xx_hal_tim_ex.c</FileName>
+              <FileName>stm32h7xx_hal_tim.c</FileName>
               <FileType>1</FileType>
-              <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_tim_ex.c</FilePath>
-            </File>
-            <File>
-              <FileName>stm32h7xx_hal_cec.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_cec.c</FilePath>
-            </File>
-            <File>
-              <FileName>stm32h7xx_hal_pwr.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_pwr.c</FilePath>
-            </File>
-            <File>
-              <FileName>stm32h7xx_hal_rcc_ex.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_rcc_ex.c</FilePath>
-            </File>
-            <File>
-              <FileName>stm32h7xx_hal_lptim.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_lptim.c</FilePath>
-            </File>
-            <File>
-              <FileName>stm32h7xx_hal_pwr_ex.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_pwr_ex.c</FilePath>
-            </File>
-            <File>
-              <FileName>stm32h7xx_hal_dma_ex.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_dma_ex.c</FilePath>
-            </File>
-            <File>
-              <FileName>stm32h7xx_hal_usart.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_usart.c</FilePath>
-            </File>
-            <File>
-              <FileName>stm32h7xx_hal_uart_ex.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_uart_ex.c</FilePath>
-            </File>
-            <File>
-              <FileName>stm32h7xx_hal_comp.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_comp.c</FilePath>
-            </File>
-            <File>
-              <FileName>stm32h7xx_hal_spi.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_spi.c</FilePath>
-            </File>
-            <File>
-              <FileName>stm32h7xx_hal_sram.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_sram.c</FilePath>
-            </File>
-            <File>
-              <FileName>stm32h7xx_hal_cryp.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_cryp.c</FilePath>
-            </File>
-            <File>
-              <FileName>stm32h7xx_hal_cryp_ex.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_cryp_ex.c</FilePath>
+              <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_tim.c</FilePath>
             </File>
             <File>
               <FileName>stm32h7xx_hal_crc_ex.c</FileName>
@@ -2800,9 +2790,19 @@
               <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_crc_ex.c</FilePath>
             </File>
             <File>
-              <FileName>stm32h7xx_hal_rng.c</FileName>
+              <FileName>stm32h7xx_hal_rcc.c</FileName>
               <FileType>1</FileType>
-              <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_rng.c</FilePath>
+              <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_rcc.c</FilePath>
+            </File>
+            <File>
+              <FileName>stm32h7xx_hal_usart.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_usart.c</FilePath>
+            </File>
+            <File>
+              <FileName>stm32h7xx_hal_dma_ex.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_dma_ex.c</FilePath>
             </File>
             <File>
               <FileName>stm32h7xx_hal_i2c_ex.c</FileName>
@@ -2810,24 +2810,24 @@
               <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_i2c_ex.c</FilePath>
             </File>
             <File>
-              <FileName>stm32h7xx_hal_qspi.c</FileName>
+              <FileName>stm32h7xx_hal_rcc_ex.c</FileName>
               <FileType>1</FileType>
-              <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_qspi.c</FilePath>
+              <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_rcc_ex.c</FilePath>
             </File>
             <File>
-              <FileName>stm32h7xx_hal_tim.c</FileName>
+              <FileName>stm32h7xx_hal_uart_ex.c</FileName>
               <FileType>1</FileType>
-              <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_tim.c</FilePath>
+              <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_uart_ex.c</FilePath>
             </File>
             <File>
-              <FileName>stm32h7xx_hal_i2c.c</FileName>
+              <FileName>stm32h7xx_hal_cec.c</FileName>
               <FileType>1</FileType>
-              <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_i2c.c</FilePath>
+              <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_cec.c</FilePath>
             </File>
             <File>
-              <FileName>stm32h7xx_hal_rcc.c</FileName>
+              <FileName>stm32h7xx_hal_spi.c</FileName>
               <FileType>1</FileType>
-              <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_rcc.c</FilePath>
+              <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_spi.c</FilePath>
             </File>
             <File>
               <FileName>stm32h7xx_hal_mdma.c</FileName>
@@ -2835,14 +2835,19 @@
               <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_mdma.c</FilePath>
             </File>
             <File>
+              <FileName>stm32h7xx_hal_tim_ex.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_tim_ex.c</FilePath>
+            </File>
+            <File>
               <FileName>stm32h7xx_hal_gpio.c</FileName>
               <FileType>1</FileType>
               <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_gpio.c</FilePath>
             </File>
             <File>
-              <FileName>stm32h7xx_hal_crc.c</FileName>
+              <FileName>stm32h7xx_hal_i2c.c</FileName>
               <FileType>1</FileType>
-              <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_crc.c</FilePath>
+              <FilePath>packages\stm32h7_hal_driver-latest\Src\stm32h7xx_hal_i2c.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -2850,14 +2855,14 @@
           <GroupName>Utilities</GroupName>
           <Files>
             <File>
-              <FileName>console_be.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>rt-thread\components\utilities\ulog\backend\console_be.c</FilePath>
-            </File>
-            <File>
               <FileName>ulog.c</FileName>
               <FileType>1</FileType>
               <FilePath>rt-thread\components\utilities\ulog\ulog.c</FilePath>
+            </File>
+            <File>
+              <FileName>console_be.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>rt-thread\components\utilities\ulog\backend\console_be.c</FilePath>
             </File>
           </Files>
         </Group>

@@ -1,18 +1,15 @@
-/*
- * 速度环控制器实现 —— 纯速度单环, 位置式 PID, 加速度斜坡, 多实例
+/**
+ * @file speed_loop.c
+ * @brief 速度环控制器实现 —— PID + 加速度斜坡
+ * @author hm
+ * @version 1.0
+ * @date 2026-06-13
  *
- * 控制周期:
- *   1. 读编码器 32-bit 位置 → delta (counts/周期)
- *   2. 换算为实测速度: actual_hz = delta * freq_hz * (steps_per_rev / enc_counts_per_rev)
- *      freq_hz = 1/period_us * 1e6, 即控制频率
- *   3. 位置式 PID(目标速度 Hz, 实测速度 Hz) → 输出频率 Hz
- *   4. 加速度斜坡限幅
- *   5. 死区判断 → 停止或输出
- *   6. 设置方向 + 频率输出
+ * @copyright Copyright (c) 2026, hm
  *
- * 多实例:
- *   全局链表 speed_loop_list, ISR 根据 hwtimer_dev 分发 semaphore.
- *   每个实例独立线程、独立 PID.
+ * @logs:
+ * Date           Version     Author      Description
+ * 2026-06-13     v1.0        hm          the first version
  */
 
 #include "speed_loop.h"

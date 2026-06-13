@@ -1,23 +1,17 @@
-/*
- * 编码器驱动实现 —— TIM Encoder 模式, 多实例安全
+/**
+ * @file stepper_encoder_driver.c
+ * @brief 编码器驱动实现 —— TIM Encoder 模式, 多实例安全
+ * @author hm
+ * @version 1.0
+ * @date 2026-06-13
  *
- * 溢出处理 (16位差值法, 无 UIF 竞态):
- *   raw = (uint16_t)CNT;
- *   diff = (int16_t)(raw - last_raw);  ← 16位有符号差自动处理溢出
- *   accum += diff;
- *   last_raw = raw;
- *   return accum;  ← 32位累加值
+ * @copyright Copyright (c) 2026, hm
  *
- * 只要两次读取之间编码器移动不超过 ±32767 counts, 就不会出错.
- * 控制周期 20ms (50Hz) → 上限 ≈ 1.6M counts/s, 远超实际需求.
+ * 溢出处理 (16位差值法, 无 UIF 竞态)
  *
- * 优点: 无需中断, 无需检查 UIF, 无竞态条件.
- *
- * 与 closed_loop/stepper_encoder.c 的区别:
- *   1. 不硬编码 TIM3 / GPIOC / GPIO_AF2_TIM3
- *   2. 不硬编码 GPIO 时钟
- *   3. 每实例独立累加器 (非全局 g_overflow)
- *   4. 纯差值法, 不用 UIF 标志
+ * @logs:
+ * Date           Version     Author      Description
+ * 2026-06-13     v1.0        hm          the first version
  */
 
 #include "stepper_encoder_driver.h"

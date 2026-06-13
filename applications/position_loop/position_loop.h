@@ -1,19 +1,20 @@
-/*
- * 位置环控制器 —— 纯位置单环, 位置式 PID
+/**
+ * @file position_loop.h
+ * @brief 位置环控制器 —— S 形加减速 + PID + 到位锁定
+ * @author hm
+ * @version 1.0
+ * @date 2026-06-13
+ *
+ * @copyright Copyright (c) 2026, hm
  *
  * 控制架构:
- *   target(counts) → [梯形速度斜坡] → [位置式PID] → DIR + PWM频率
- *                         ↑
- *                  encoder ←── 位置反馈 (32-bit counts)
+ *   target → [S 形速度斜坡] → [PID + 前馈] → DIR + 脉冲频率
+ *                       ↑                          ↓
+ *                encoder ←────────────── 位置反馈 (32-bit counts)
  *
- * 与 speed_loop 的区别:
- *   1. 控制目标是编码器位置 (counts), 不是速度 (Hz)
- *   2. 反馈是编码器当前位置, 无需速度换算
- *   3. PID 输出 = 频率 (Hz), 直接驱动电机
- *   4. 目标位置通过梯形速度曲线平滑过渡
- *
- * 多实例支持:
- *   全局链表, ISR 根据 hwtimer 设备分发 semaphore.
+ * @logs:
+ * Date           Version     Author      Description
+ * 2026-06-13     v1.0        hm          S-curve, position_scale, blocking API
  */
 
 #ifndef POSITION_LOOP_H__
@@ -22,6 +23,7 @@
 #include "../stepper_drv/stepper_motor_driver.h"
 #include "../stepper_drv/stepper_encoder_driver.h"
 #include "../stepper_drv/stepper_pid_pos.h"
+#include "../stepper_drv/position_scale.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -48,11 +50,14 @@ typedef struct position_loop {
     float  move_threshold;        /* 到位死区 (counts)        */
     float  max_accel;             /* 加减速 (Hz/period)       */
     int    enc_invert;            /* 编码器方向反转           */
+    position_scale_t scale;        /* 物理位置 ↔ 计数值 拟合    */
 
-    /* 目标位置斜坡 (梯形速度曲线) */
+    /* 目标位置斜坡 (S 形速度曲线) */
     rt_int32_t target_pos;        /* 最终目标位置 (counts)     */
     rt_int32_t ramp_pos;          /* 斜坡平滑后的即时目标      */
     float      ramp_speed;        /* 当前斜坡速度 (Hz)         */
+    float      ramp_accel;        /* 当前加速度 (Hz/period)    */
+    float      s_curve_jerk;      /* S 形加加速度 (Hz/period²) */
     float      ramp_max_speed;    /* 最大斜坡速度 (Hz)         */
 
     /* 运行时状态 */
@@ -80,8 +85,12 @@ typedef struct position_loop {
  * @param enc_invert      编码器方向反转 (1=反转)
  * @param speed_limit     定位速度上限 (Hz)
  * @param move_threshold  到位死区 (counts)
- * @param max_accel       加减速 (Hz/period)
- * @param ramp_max_speed  梯形速度曲线最大速度 (Hz)
+ * @param max_accel       最大加速度 (Hz/period)
+ * @param s_curve_jerk    S 形加加速度 (Hz/period²), 越小越平滑
+ * @param ramp_max_speed  最大斜坡速度 (Hz)
+ * @param counts_per_unit 每个物理单位的编码器计数值
+ * @param unit            单位名 ("mm", "°" 等)
+ * @param pos_min / pos_max 物理软限位
  */
 rt_err_t position_loop_init(position_loop_t         *pl,
                             stepper_motor_driver_t   *motor,
@@ -93,7 +102,12 @@ rt_err_t position_loop_init(position_loop_t         *pl,
                             float                     speed_limit,
                             float                     move_threshold,
                             float                     max_accel,
-                            float                     ramp_max_speed);
+                            float                     s_curve_jerk,
+                            float                     ramp_max_speed,
+                            float                     counts_per_unit,
+                            const char               *unit,
+                            float                     pos_min,
+                            float                     pos_max);
 
 /** 启动位置环 */
 void position_loop_start(position_loop_t *pl);
@@ -104,11 +118,38 @@ void position_loop_stop(position_loop_t *pl);
 /** 设置目标位置 (counts) */
 void position_loop_set_target(position_loop_t *pl, rt_int32_t target);
 
-/** 获取当前位置 */
+/** 获取当前位置 (counts) */
 rt_int32_t position_loop_get_position(position_loop_t *pl);
+
+/** 获取当前位置 (物理单位) */
+float position_loop_get_position_physical(position_loop_t *pl);
+
+/** 阻塞式定位 — 物理单位版 */
+int position_loop_move_to_physical(position_loop_t *pl,
+                                    float target, rt_uint32_t timeout_ms);
 
 /** 是否已到位 */
 int position_loop_is_arrived(position_loop_t *pl);
+
+/**
+ * 阻塞式定位: 设目标, 等到位/故障/超时
+ * @param timeout_ms  超时 (ms), 0=不限
+ * @return MOTOR_E_OK(到位) / MOTOR_E_FAULT / MOTOR_E_HOME_TIMEOUT(超时)
+ */
+int position_loop_move_to(position_loop_t *pl,
+                          rt_int32_t target, rt_uint32_t timeout_ms);
+
+/**
+ * 阻塞式找零
+ * @param home_pin    原点引脚
+ * @param home_dir    找零方向
+ * @param speed_hz    找零速度
+ * @param timeout_ms  超时 (ms)
+ * @return MOTOR_E_OK 或错误码
+ */
+int position_loop_home(position_loop_t *pl, stepper_encoder_driver_t *enc,
+                       rt_base_t home_pin, int home_dir,
+                       rt_uint32_t speed_hz, rt_uint32_t timeout_ms);
 
 static __inline int position_loop_is_running(const position_loop_t *pl)
 {

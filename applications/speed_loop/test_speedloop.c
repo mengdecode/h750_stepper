@@ -1,14 +1,15 @@
-/*
- * 速度环电机控制 —— 测试例程
+/**
+ * @file test_speedloop.c
+ * @brief 速度环电机控制 —— 测试例程 & 配置
+ * @author hm
+ * @version 1.0
+ * @date 2026-06-13
  *
- * 命令:
- *   speedloop <motor_id> <freq_hz>  → 启动/设目标 (正=CW, 负=CCW, 0=停止)
- *   speedloop                        → 查看所有电机状态
- *   speedloop_tune <motor_id> <kp> <ki> <kd>  → 在线调参
- *   speedloop_start <motor_id>       → 启动
- *   speedloop_stop  <motor_id>       → 停止
+ * @copyright Copyright (c) 2026, hm
  *
- * 硬件配置通过 Kconfig 设置, 映射表见下方.
+ * @logs:
+ * Date           Version     Author      Description
+ * 2026-06-13     v1.0        hm          the first version
  */
 
 #include <rtthread.h>
@@ -367,6 +368,7 @@ static int ensure_inited(int motor_id)
                                     (rt_uint8_t)cfg->pulse_af,
                                     (rt_base_t)cfg->dir_pin,
                                     (rt_base_t)cfg->en_pin,
+                                    -1,  /* fault_pin: not used */
                                     0);  /* dir_invert: speed_loop not using */
     if (ret) {
         LOG_E("M%d motor init failed %d", motor_id, ret);

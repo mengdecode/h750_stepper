@@ -1,14 +1,15 @@
-/*
- * 位置式 PID 算法实现 —— 纯 C，无任何 include 依赖（除了自身的 .h）
+/**
+ * @file stepper_pid_pos.c
+ * @brief 位置式 PID 算法实现 —— 抗饱和 (back-calculation)
+ * @author hm
+ * @version 1.0
+ * @date 2026-06-13
  *
- * 公式: u(k) = Kp*e(k) + Ki*Σe + Kd*(e(k)-e(k-1))
+ * @copyright Copyright (c) 2026, hm
  *
- * 抗饱和策略 (back-calculation):
- *   输出超限时反算积分项: I = (output_limit - P - D) / Ki → 更新 integral_acc
- *   这样一旦误差变号, P 项反转, 输出立刻脱离饱和区, 不会长时间震荡.
- *
- * 符号约定:
- *   正输出 → CW 方向; 负输出 → CCW 方向
+ * @logs:
+ * Date           Version     Author      Description
+ * 2026-06-13     v1.0        hm          抗饱和 PID, 纯算法模块
  */
 
 #include "stepper_pid_pos.h"

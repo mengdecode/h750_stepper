@@ -1,7 +1,15 @@
-/*
- * 步进电机开环速度控制器 (带加速度斜坡, 多实例支持)
+/**
+ * @file stepper_openloop.h
+ * @brief 步进电机开环速度控制器 (带加速度斜坡)
+ * @author hm
+ * @version 1.0
+ * @date 2026-06-13
  *
- * 无编码器反馈, 仅按设定频率 + 斜坡输出 PWM 脉冲。
+ * @copyright Copyright (c) 2026, hm
+ *
+ * @logs:
+ * Date           Version     Author      Description
+ * 2026-06-13     v1.0        hm          the first version
  */
 
 #ifndef STEPPER_OPENLOOP_H__

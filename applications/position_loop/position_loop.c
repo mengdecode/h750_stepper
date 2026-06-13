@@ -1,15 +1,15 @@
-/*
- * 位置环控制器实现 —— 纯位置单环, 位置式 PID, 梯形速度斜坡
+/**
+ * @file position_loop.c
+ * @brief 位置环控制器实现 —— S 形加减速 + 位置式 PID + 到位锁定
+ * @author hm
+ * @version 1.0
+ * @date 2026-06-13
  *
- * 控制周期:
- *   1. 读编码器 32-bit 位置
- *   2. 目标位置梯形斜坡: ramp_pos → target_pos
- *   3. 位置式 PID(ramp_pos, current_pos) → 频率 Hz
- *   4. 死区判断 → 到位停止
- *   5. 方向 + 频率输出
+ * @copyright Copyright (c) 2026, hm
  *
- * 多实例:
- *   全局链表, ISR 根据 hwtimer_dev 分发 semaphore.
+ * @logs:
+ * Date           Version     Author      Description
+ * 2026-06-13     v1.0        hm          S-curve, jerk-limit, blocking API, fault/idle tick
  */
 
 #include "position_loop.h"
@@ -48,7 +48,12 @@ rt_err_t position_loop_init(position_loop_t         *pl,
                             float                     speed_limit,
                             float                     move_threshold,
                             float                     max_accel,
-                            float                     ramp_max_speed)
+                            float                     s_curve_jerk,
+                            float                     ramp_max_speed,
+                            float                     counts_per_unit,
+                            const char               *unit,
+                            float                     pos_min,
+                            float                     pos_max)
 {
     rt_err_t ret;
     rt_hwtimerval_t  tv;
@@ -66,14 +71,17 @@ rt_err_t position_loop_init(position_loop_t         *pl,
     pl->speed_limit    = speed_limit;
     pl->move_threshold = move_threshold;
     pl->max_accel      = max_accel;
+    pl->s_curve_jerk   = s_curve_jerk;
     pl->ramp_max_speed = ramp_max_speed;
     pl->enc_invert     = enc_invert;
+    position_scale_init(&pl->scale, counts_per_unit, unit, pos_min, pos_max);
 
     pl->running        = 0;
     pl->arrived_locked = 0;
     pl->target_pos   = 0;
     pl->ramp_pos     = 0;
     pl->ramp_speed   = 0;
+    pl->ramp_accel   = 0;
     pl->last_enc     = 0;
     pl->current_pos  = 0;
     pl->prev_pos_err = 0;
@@ -118,10 +126,13 @@ rt_err_t position_loop_init(position_loop_t         *pl,
     rt_thread_startup(pl->thread);
 
     LOG_I("init ok  timer=%s %luus/%luHz  limit=%.0fHz  "
-          "thr=%.0f  accel=%.0f  ramp_max=%.0fHz",
+          "thr=%.0f  accel=%.0f  jerk=%.0f  ramp=%.0fHz  "
+          "scale=%.0fcnt/%s  range[%.0f, %.0f]%s",
           timer_device, (unsigned long)period_us, (unsigned long)pl->freq_hz,
           (double)speed_limit, (double)move_threshold,
-          (double)max_accel, (double)ramp_max_speed);
+          (double)max_accel, (double)s_curve_jerk, (double)ramp_max_speed,
+          (double)counts_per_unit, unit,
+          (double)pos_min, (double)pos_max, unit);
     return RT_EOK;
 }
 
@@ -142,6 +153,7 @@ static void pl_thread_entry(void *param)
 
         if (!pl->running) {
             pl->ramp_speed = 0;
+            pl->ramp_accel = 0;
             pl->output_freq = 0;
             continue;
         }
@@ -152,42 +164,88 @@ static void pl_thread_entry(void *param)
         pl->current_pos = enc_pos;
         pl->last_enc    = enc_pos;
 
-        /* 2. 目标位置梯形斜坡 */
+        /* 1.5 故障检测 & 空闲电流 */
+        if (stepper_motor_driver_check_fault(pl->motor)) {
+            LOG_E("motor fault detected, stopping");
+            position_loop_stop(pl);
+            continue;
+        }
+        stepper_motor_driver_idle_tick(pl->motor);
+
+        /* 2. 目标位置 S 形斜坡
+         *    加速度的变化率受 jerk 限制, 速度曲线自然形成 S 形
+         *    对比梯形: 梯形加速度突变 → 电机抖动;  S 形平滑 → 运行安静 */
         {
             rt_int32_t ramp_err = pl->target_pos - pl->ramp_pos;
             int        sign     = (ramp_err > 0) ? 1 : ((ramp_err < 0) ? -1 : 0);
-            float      dist     = fabsf((float)ramp_err);
+            float      remain   = fabsf((float)ramp_err);
 
-            if (sign != 0) {
-                /* 计算减速距离: v^2 / (2a) */
-                float decel_dist = (pl->ramp_speed * pl->ramp_speed)
-                                 / (2.0f * pl->max_accel * (float)pl->freq_hz);
+            if (sign != 0 && remain > 0.5f) {
+                /* S 形制动速度: v² = 2*a*(d/freq)*freq² → v = sqrt(2*a*freq*d)
+                 *   0.75 安全系数补偿 S 形平滑多用的制动距离 */
+                float v_stop_limit = sqrtf(2.0f * pl->max_accel
+                                           * (float)pl->freq_hz * remain * 0.75f);
+                float v_target;
 
-                if (dist <= decel_dist + 1.0f) {
-                    /* 减速阶段 */
-                    pl->ramp_speed -= pl->max_accel;
-                    if (pl->ramp_speed < pl->max_accel)
-                        pl->ramp_speed = pl->max_accel;
-                } else if (pl->ramp_speed < pl->ramp_max_speed) {
-                    /* 加速阶段 */
-                    pl->ramp_speed += pl->max_accel;
-                    if (pl->ramp_speed > pl->ramp_max_speed)
-                        pl->ramp_speed = pl->ramp_max_speed;
+                /* 目标速度: 取减速限制 与 最大巡航速度 的较小值 */
+                v_target = (v_stop_limit < pl->ramp_max_speed)
+                         ? v_stop_limit : pl->ramp_max_speed;
+                v_target *= (float)sign;
+
+                /* 期望加速度 = 消除速度差所需的加速度 */
+                float a_desired = v_target - pl->ramp_speed;
+
+                /* 硬限幅到 ±max_accel */
+                if (a_desired >  pl->max_accel) a_desired =  pl->max_accel;
+                if (a_desired < -pl->max_accel) a_desired = -pl->max_accel;
+
+                /* ---- S 形核心: 加加速度 (jerk) 平滑 ----
+                 *   加速度不跳变, 而是每周期最多变化 ±jerk */
+                float jerk = pl->s_curve_jerk;
+                if (a_desired > pl->ramp_accel + jerk) {
+                    pl->ramp_accel += jerk;
+                } else if (a_desired < pl->ramp_accel - jerk) {
+                    pl->ramp_accel -= jerk;
+                } else {
+                    pl->ramp_accel = a_desired;
                 }
 
-                /* ramp_pos 按速度移动: speed(Hz) / freq_hz(Hz) = counts/周期 */
-                pl->ramp_pos += (rt_int32_t)((float)sign * pl->ramp_speed
-                                             / (float)pl->freq_hz);
+                /* 积分: 速度 += 加速度 */
+                pl->ramp_speed += pl->ramp_accel;
+                if (pl->ramp_speed >  pl->ramp_max_speed) pl->ramp_speed =  pl->ramp_max_speed;
+                if (pl->ramp_speed < -pl->ramp_max_speed) pl->ramp_speed = -pl->ramp_max_speed;
+
+                /* 积分: 位置 += 速度 / 控制频率 */
+                pl->ramp_pos += (rt_int32_t)(pl->ramp_speed / (float)pl->freq_hz);
+
                 /* 防止超调 */
                 if ((sign > 0 && pl->ramp_pos > pl->target_pos) ||
                     (sign < 0 && pl->ramp_pos < pl->target_pos))
                     pl->ramp_pos = pl->target_pos;
 
-                /* 防止斜坡超前电机太多: 限幅当前误差 ≤ 200 counts */
-                if (pl->ramp_pos - pl->current_pos > 200)
-                    pl->ramp_pos = pl->current_pos + 200;
-                else if (pl->current_pos - pl->ramp_pos > 200)
-                    pl->ramp_pos = pl->current_pos - 200;
+                /* 防止斜坡超前/滞后电机太多: 限幅 = max(200, 2周期行程) */
+                {
+                    rt_int32_t lead = (rt_int32_t)(fabsf(pl->ramp_speed)
+                                     / (float)pl->freq_hz * 2.0f);
+                    if (lead < 200) lead = 200;
+                    if (lead > 2000) lead = 2000;
+                    if (pl->ramp_pos - pl->current_pos > lead)
+                        pl->ramp_pos = pl->current_pos + lead;
+                    else if (pl->current_pos - pl->ramp_pos > lead)
+                        pl->ramp_pos = pl->current_pos - lead;
+
+                    /* 电机冲过目标后, ramp 必须停在目标, 不能跟着冲 */
+                    if (pl->ramp_pos > pl->target_pos
+                        && pl->current_pos <= pl->target_pos)
+                        pl->ramp_pos = pl->target_pos;
+                    else if (pl->ramp_pos < pl->target_pos
+                             && pl->current_pos >= pl->target_pos)
+                        pl->ramp_pos = pl->target_pos;
+                }
+            } else {
+                /* 到位: 清零加速度和速度 */
+                pl->ramp_accel = 0;
+                pl->ramp_speed = 0;
             }
         }
 
@@ -209,7 +267,7 @@ static void pl_thread_entry(void *param)
             {
                 rt_int32_t final_err = pl->target_pos - pl->current_pos;
 
-                if (abs(final_err) <= 1)
+                if (final_err == 0)
                 {
                     freq_out = 0;
                 }
@@ -228,12 +286,10 @@ static void pl_thread_entry(void *param)
             }
             else
             {
-                /* ---- 远离目标: PID + 前馈 (原有逻辑) ---- */
-                int   ramp_sign = (pl->target_pos > pl->ramp_pos) ? 1
-                                : ((pl->target_pos < pl->ramp_pos) ? -1 : 0);
-                float ff_speed  = (float)ramp_sign * pl->ramp_speed;
+                /* ---- 远离目标: PID + 前馈 ---- */
+                float ff_speed  = pl->ramp_speed;  /* ramp_speed 已带符号 */
                 float pid_corr;
-                float corr_limit = pl->ramp_max_speed * 0.25f;
+                float corr_limit = pl->ramp_max_speed * 0.05f;
 
                 stepper_pid_pos_set_target(pl->pid, (float)pl->ramp_pos);
                 pid_corr = stepper_pid_pos_calculate(pl->pid, (float)pl->current_pos);
@@ -270,10 +326,17 @@ static void pl_thread_entry(void *param)
 log_tick:
         if (++tick >= pl->freq_hz / 2) {
             tick = 0;
-            LOG_I("pos=%ld  ramp=%ld  target=%ld  err=%.0f  out=%.1fHz  dir=%s",
-                  (long)pl->current_pos, (long)pl->ramp_pos,
-                  (long)pl->target_pos,
-                  (double)(pl->target_pos - pl->current_pos),
+            LOG_I("pos=%.2f%s(%ld)  ramp=%.2f%s(%ld)  "
+                  "tgt=%.2f%s(%ld)  err=%.2f%s  out=%.0fHz  dir=%s",
+                  (double)position_scale_to_physical(&pl->scale, pl->current_pos),
+                  pl->scale.unit, (long)pl->current_pos,
+                  (double)position_scale_to_physical(&pl->scale, pl->ramp_pos),
+                  pl->scale.unit, (long)pl->ramp_pos,
+                  (double)position_scale_to_physical(&pl->scale, pl->target_pos),
+                  pl->scale.unit, (long)pl->target_pos,
+                  (double)(pl->target_pos - pl->current_pos)
+                    / (double)pl->scale.counts_per_unit,
+                  pl->scale.unit,
                   (double)pl->output_freq,
                   pl->output_freq > 0 ? "CW" : (pl->output_freq < 0 ? "CCW" : "STOP"));
         }
@@ -286,6 +349,9 @@ void position_loop_start(position_loop_t *pl)
 {
     if (pl->running) return;
 
+    /* 清除上一次故障的残留状态 */
+    stepper_motor_driver_clear_fault(pl->motor);
+
     stepper_pid_pos_reset(pl->pid);
     pl->current_pos = stepper_encoder_driver_read(pl->encoder);
     if (pl->enc_invert) pl->current_pos = -pl->current_pos;
@@ -293,11 +359,12 @@ void position_loop_start(position_loop_t *pl)
     pl->target_pos = pl->current_pos;
     pl->ramp_pos   = pl->current_pos;
     pl->ramp_speed = 0;
+    pl->ramp_accel = 0;
     pl->output_freq = 0;
 
     stepper_motor_driver_start(pl->motor);
     pl->running = 1;
-    LOG_I("started  pos=%ld", (long)pl->current_pos);
+    LOG_D("started  pos=%ld", (long)pl->current_pos);
 }
 
 void position_loop_stop(position_loop_t *pl)
@@ -307,22 +374,32 @@ void position_loop_stop(position_loop_t *pl)
 
     stepper_pid_pos_reset(pl->pid);
     pl->ramp_speed   = 0;
+    pl->ramp_accel   = 0;
     pl->output_freq  = 0;
     pl->ramp_pos     = 0;
     pl->target_pos   = 0;
-    LOG_I("stopped");
+    LOG_D("stopped");
 }
 
 void position_loop_set_target(position_loop_t *pl, rt_int32_t target)
 {
+    /* 软限位: 超出范围不响应 */
+    if (target < pl->scale.pos_min_counts || target > pl->scale.pos_max_counts) {
+        LOG_W("target %ld out of range [%ld, %ld] counts",
+              (long)target, (long)pl->scale.pos_min_counts,
+              (long)pl->scale.pos_max_counts);
+        return;
+    }
     /* 如果目标变更较大, 重置斜坡从当前位置开始 */
     if (pl->running) {
         pl->ramp_pos   = pl->current_pos;
         pl->ramp_speed = 0;
+        pl->ramp_accel = 0;
+        stepper_pid_pos_reset(pl->pid);
     }
     pl->target_pos      = target;
     pl->arrived_locked  = 0;  /* 新目标, 解锁 */
-    LOG_I("target -> %ld  (from %ld)", (long)target, (long)pl->current_pos);
+    LOG_D("target -> %ld  (from %ld)", (long)target, (long)pl->current_pos);
 }
 
 rt_int32_t position_loop_get_position(position_loop_t *pl)
@@ -330,7 +407,76 @@ rt_int32_t position_loop_get_position(position_loop_t *pl)
     return pl->current_pos;
 }
 
+float position_loop_get_position_physical(position_loop_t *pl)
+{
+    return position_scale_to_physical(&pl->scale, pl->current_pos);
+}
+
+int position_loop_move_to_physical(position_loop_t *pl,
+                                    float target, rt_uint32_t timeout_ms)
+{
+    if (!position_scale_check_range(&pl->scale, target))
+        return MOTOR_E_OUT_OF_RANGE;
+    rt_int32_t counts = position_scale_to_counts(&pl->scale, target);
+    return position_loop_move_to(pl, counts, timeout_ms);
+}
+
 int position_loop_is_arrived(position_loop_t *pl)
 {
     return abs(pl->target_pos - pl->current_pos) < (rt_int32_t)pl->move_threshold;
+}
+
+int position_loop_move_to(position_loop_t *pl,
+                          rt_int32_t target, rt_uint32_t timeout_ms)
+{
+    rt_tick_t deadline = 0;
+    int ret = MOTOR_E_OK;
+
+    if (!pl->running) return MOTOR_E_NOT_RUNNING;
+    if (pl->motor->fault_state != MOTOR_FAULT_NONE) return MOTOR_E_FAULT;
+    if (target < pl->scale.pos_min_counts || target > pl->scale.pos_max_counts)
+        return MOTOR_E_OUT_OF_RANGE;
+
+    position_loop_set_target(pl, target);
+
+    if (timeout_ms > 0)
+        deadline = rt_tick_get() + rt_tick_from_millisecond(timeout_ms);
+
+    while (!position_loop_is_arrived(pl)) {
+        /* 检查故障 */
+        if (pl->motor->fault_state != MOTOR_FAULT_NONE) {
+            ret = MOTOR_E_FAULT;
+            break;
+        }
+        /* 检查超时 */
+        if (timeout_ms > 0 && rt_tick_get() >= deadline) {
+            ret = MOTOR_E_HOME_TIMEOUT;
+            break;
+        }
+        rt_thread_mdelay(10);
+    }
+
+    return ret;
+}
+
+int position_loop_home(position_loop_t *pl, stepper_encoder_driver_t *enc,
+                       rt_base_t home_pin, int home_dir,
+                       rt_uint32_t speed_hz, rt_uint32_t timeout_ms)
+{
+    int ret;
+
+    if (!pl->running) return MOTOR_E_NOT_RUNNING;
+
+    ret = stepper_motor_driver_home(pl->motor, home_pin, home_dir,
+                                    speed_hz, 0, timeout_ms);
+    if (ret != MOTOR_E_OK) return ret;
+
+    /* 零点: 编码器清零, 位置环复位, 记录 home_offset */
+    stepper_encoder_driver_clear(enc);
+    position_scale_set_home(&pl->scale, 0);
+    pl->current_pos = 0;
+    pl->target_pos  = 0;
+    pl->ramp_pos    = 0;
+
+    return MOTOR_E_OK;
 }

@@ -1,24 +1,17 @@
-/*
- * 编码器驱动 —— 基于 TIM Encoder 模式, 多实例安全
+/**
+ * @file stepper_encoder_driver.h
+ * @brief 编码器驱动 —— 基于 TIM Encoder 模式, 多实例安全
+ * @author hm
+ * @version 1.0
+ * @date 2026-06-13
  *
- * 设计原则：
- *   - 不硬编码任何外设 (TIM 实例、GPIO 全部参数传入)
- *   - 每个实例独立的溢出计数器 (无全局变量)
- *   - 16 位计数器溢出在 read() 中实时检测并累加
- *   - 临界区保护 (关中断) 保证 32 位读原子性
+ * @copyright Copyright (c) 2026, hm
  *
- * 与 closed_loop/stepper_encoder.c 的区别:
- *   1. 不硬编码 TIM3 / GPIOC / PC6 / PC7 / GPIO_AF2_TIM3
- *   2. 不硬编码 GPIO 时钟使能 (根据 port 动态使能)
- *   3. 每个实例独立 overflow 计数器 (非全局变量 g_overflow)
- *   4. 支持多编码器同时工作 (不同 TIM 实例)
+ * 设计原则: 不硬编码外设, TIM/GPIO 全部参数传入
  *
- * 使用方式：
- *   stepper_encoder_driver_t enc;
- *   stepper_encoder_driver_init(&enc, TIM3,
- *                                GPIOC, GPIO_PIN_6, GPIO_AF2_TIM3,
- *                                GPIOC, GPIO_PIN_7, GPIO_AF2_TIM3);
- *   rt_int32_t pos = stepper_encoder_driver_read(&enc);
+ * @logs:
+ * Date           Version     Author      Description
+ * 2026-06-13     v1.0        hm          the first version
  */
 
 #ifndef STEPPER_ENCODER_DRIVER_H__

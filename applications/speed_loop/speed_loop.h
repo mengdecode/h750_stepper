@@ -1,16 +1,15 @@
-/*
- * 速度环控制器 —— 纯速度单环, 位置式 PID
+/**
+ * @file speed_loop.h
+ * @brief 速度环控制器 —— 纯速度单环, 位置式 PID
+ * @author hm
+ * @version 1.0
+ * @date 2026-06-13
  *
- * 控制架构:
- *   target_freq(Hz) → [位置式PID] → 加速度斜坡 → DIR + PWM频率
- *                         ↑
- *                  encoder ←── 实测速度(Hz) = delta * freq_hz * (steps/enc_per_rev)
+ * @copyright Copyright (c) 2026, hm
  *
- * 单位统一: target 和 feedback 都是 Hz, PID 输出也是 Hz
- *
- * 多实例支持:
- *   全局链表, ISR 根据 hwtimer 设备分发 semaphore 到对应控制器.
- *   每个控制器独立线程、独立 PID、独立电机/编码器.
+ * @logs:
+ * Date           Version     Author      Description
+ * 2026-06-13     v1.0        hm          the first version
  */
 
 #ifndef SPEED_LOOP_H__
